@@ -1,0 +1,16 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://sageflow.local/schemas/procedural-rule.schema.json",
+  "title": "ProceduralRule",
+  "type": "object",
+  "required": ["rule_id", "user_id", "conditions", "service_policy", "confidence", "evidence_event_ids", "status"],
+  "properties": {
+    "rule_id": {"type": "string"},
+    "user_id": {"type": "string"},
+    "conditions": {"type": "array", "minItems": 1},
+    "service_policy": {"type": "object"},
+    "confidence": {"type": "number", "minimum": 0, "maximum": 1},
+    "evidence_event_ids": {"type": "array", "minItems": 1, "items": {"type": "string"}},
+    "status": {"enum": ["active", "superseded", "expired"]}
+  }
+}

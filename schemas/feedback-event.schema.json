@@ -1,0 +1,13 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://sageflow.local/schemas/feedback-event.schema.json",
+  "title": "FeedbackEvent",
+  "type": "object",
+  "required": ["schema_version", "event_id", "event_type", "user_id", "trip_id", "occurred_at", "recorded_at", "source", "payload", "trace_id"],
+  "properties": {
+    "schema_version": {"const": "1.0"},
+    "event_type": {"enum": ["feedback.action_accepted", "feedback.action_rejected", "feedback.action_ignored", "feedback.user_corrected"]},
+    "payload": {"type": "object", "required": ["decision_id"]}
+  },
+  "additionalProperties": true
+}

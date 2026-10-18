@@ -1,0 +1,13 @@
+{
+  "suite_version": "1.0",
+  "disclaimer": "人工编写的确定性检索样例，不代表真实用户或线上召回率。",
+  "cases": [
+    {"id":"R01","title":"摄影兴趣语义查询","seed_memory_ids":["mem_photography","mem_slow_pace","mem_budget_150"],"request":{"purpose":"conversation","query_text":"photography architecture","situation":{"trip_kind":"leisure_trip"},"limit":2},"relevant_ids":["mem_photography"]},
+    {"id":"R02","title":"决策必须带预算和打扰约束","seed_memory_ids":["mem_photography","mem_budget_150","mem_low_interrupt"],"request":{"purpose":"decision","query_text":"photography","situation":{"activity_kind":"single_activity"},"limit":1},"relevant_ids":["mem_photography","mem_budget_150","mem_low_interrupt"],"required_ids":["mem_budget_150","mem_low_interrupt"]},
+    {"id":"R03","title":"旅行范围硬过滤","seed_memory_ids":["mem_slow_pace","mem_fast_pace"],"request":{"purpose":"conversation","predicates":["prefers_travel_pace"],"situation":{"trip_kind":"city_break"},"limit":2},"relevant_ids":["mem_fast_pace"],"forbidden_ids":["mem_slow_pace"]},
+    {"id":"R04","title":"同行儿童场景","seed_memory_ids":["mem_family_low_load","mem_photography"],"request":{"purpose":"decision","query_text":"child low activity load","situation":{"party":"with_child"},"limit":2},"relevant_ids":["mem_family_low_load"]},
+    {"id":"R05","title":"敏感信息没有授权","seed_memory_ids":["mem_photography","mem_low_interrupt"],"overrides":{"mem_photography":{"sensitivity":"sensitive"}},"request":{"purpose":"conversation","query_text":"photography","limit":2},"relevant_ids":[],"forbidden_ids":["mem_photography"]},
+    {"id":"R06","title":"冲突双方应可追溯","seed_memory_ids":["mem_slow_pace","mem_fast_pace"],"overrides":{"mem_fast_pace":{"scope":{"domain":"travel","applies_when":["leisure_trip"]}}},"request":{"purpose":"conversation","predicates":["prefers_travel_pace"],"situation":{"trip_kind":"leisure_trip"},"limit":2},"relevant_ids":["mem_slow_pace","mem_fast_pace"],"conflict_ids":["mem_slow_pace","mem_fast_pace"]},
+    {"id":"R07","title":"图关系扩展召回关联记忆","seed_memory_ids":["mem_slow_pace","mem_fast_pace"],"overrides":{"mem_fast_pace":{"statement":{"subject":"user","predicate":"current_trip_pace","value":"fast"},"scope":{"domain":"travel","applies_when":["leisure_trip"]}}},"edges":[{"edge_id":"edge_related_pace","user_id":"usr_001","source_id":"mem_slow_pace","source_type":"memory","target_id":"mem_fast_pace","target_type":"memory","relation":"EXCEPTION_TO"}],"request":{"purpose":"conversation","required_memory_ids":["mem_slow_pace"],"situation":{"trip_kind":"leisure_trip"},"limit":2},"relevant_ids":["mem_slow_pace","mem_fast_pace"]}
+  ]
+}

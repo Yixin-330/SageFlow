@@ -1,0 +1,77 @@
+{
+  "version": "0.1",
+  "disclaimer": "确定性工程回归，不代表真实模型或真实用户评测。",
+  "cases": [
+    {
+      "id": "M01",
+      "title": "明确稳定偏好进入长期记忆",
+      "category": "extraction",
+      "event": {"id":"m01_evt","type":"dialogue.user_statement","description":"我平时旅行喜欢慢一点，不想一直赶路"},
+      "candidate": {"statement":{"subject":"user","predicate":"prefers_travel_pace","value":"slow"},"memory_tier":"long_term","memory_domain":"user","memory_kind":"semantic","scope":{"domain":"travel","applies_when":["leisure_trip"],"topic":"travel_pacing"},"evidence_kind":"explicit_statement","confidence":0.91,"salience":0.86,"retention":"long_term_candidate","sensitivity":"normal"},
+      "expected": {"mutation":"CREATE","active_values":["slow"]}
+    },
+    {
+      "id": "M02",
+      "title": "今天想多走走只形成短期意图",
+      "category": "scope",
+      "seed_memory_ids": ["mem_slow_pace"],
+      "event": {"id":"m02_evt","type":"dialogue.user_statement","description":"我今天状态很好，就是想多走走"},
+      "candidate": {"statement":{"subject":"user","predicate":"prefers_travel_pace","value":"fast"},"memory_tier":"short_term","memory_domain":"user","memory_kind":"semantic","scope":{"domain":"travel","applies_when":["trip_hangzhou_001"],"topic":"travel_pacing"},"evidence_kind":"explicit_statement","confidence":0.95,"salience":0.9,"retention":"current_trip","sensitivity":"normal"},
+      "recall": {"trip_id":"trip_hangzhou_001","topics":["travel_pacing"],"situation":{"trip_kind":"leisure_trip"}},
+      "expected": {"mutation":"CREATE","active_values":["slow","fast"],"recall_count":2}
+    },
+    {
+      "id": "M03",
+      "title": "无原因拒绝不修改摄影偏好",
+      "category": "feedback",
+      "seed_memory_ids": ["mem_photography"],
+      "event": {"id":"m03_evt","type":"feedback.action_rejected","description":"用户拒绝本次摄影展建议"},
+      "expected": {"mutation":"NO_LONG_TERM_CHANGE","active_values":["photography_and_architecture"]}
+    },
+    {
+      "id": "M04",
+      "title": "同范围相反证据进入冲突集合",
+      "category": "conflict",
+      "seed_memory_ids": ["mem_slow_pace"],
+      "event": {"id":"m04_evt","type":"dialogue.user_statement","description":"我现在旅行一直喜欢多打卡"},
+      "candidate": {"statement":{"subject":"user","predicate":"prefers_travel_pace","value":"fast"},"memory_tier":"long_term","memory_domain":"user","memory_kind":"semantic","scope":{"domain":"travel","applies_when":["leisure_trip"],"topic":"travel_pacing"},"evidence_kind":"explicit_statement","confidence":0.76,"salience":0.78,"retention":"long_term_candidate","sensitivity":"normal"},
+      "recall": {"topics":["travel_pacing"],"situation":{"trip_kind":"leisure_trip"}},
+      "expected": {"mutation":"FLAG_CONFLICT","active_values":["slow","fast"],"conflict_count":1}
+    },
+    {
+      "id": "M05",
+      "title": "用户明确纠正可替代错误记忆",
+      "category": "correction",
+      "seed_memory_ids": ["mem_fast_pace"],
+      "event": {"id":"m05_evt","type":"feedback.user_corrected","description":"你理解错了，我平时并不赶行程"},
+      "candidate": {"statement":{"subject":"user","predicate":"prefers_travel_pace","value":"slow"},"memory_tier":"long_term","memory_domain":"user","memory_kind":"semantic","scope":{"domain":"travel","applies_when":["city_break"],"topic":"travel_pacing"},"evidence_kind":"user_correction","confidence":0.98,"salience":0.95,"retention":"long_term_candidate","sensitivity":"normal"},
+      "expected": {"mutation":"SUPERSEDE","active_values":["slow"],"superseded_values":["fast"]}
+    },
+    {
+      "id": "M06",
+      "title": "未授权健康信息不得保存",
+      "category": "privacy",
+      "event": {"id":"m06_evt","type":"dialogue.user_statement","description":"我的健康状况需要频繁休息"},
+      "candidate": {"statement":{"subject":"user","predicate":"health_constraint","value":"needs_frequent_rest"},"memory_tier":"long_term","memory_domain":"user","memory_kind":"semantic","scope":{"domain":"travel","topic":"accessibility"},"evidence_kind":"explicit_statement","confidence":0.94,"salience":0.98,"retention":"long_term_candidate","sensitivity":"sensitive"},
+      "expected": {"rejection":"SENSITIVE_STORAGE_PERMISSION_REQUIRED","active_values":[]}
+    },
+    {
+      "id": "M07",
+      "title": "本次旅行记忆不进入另一趟旅行",
+      "category": "recall",
+      "event": {"id":"m07_evt","type":"dialogue.user_statement","description":"这次杭州我想走快一点"},
+      "candidate": {"statement":{"subject":"user","predicate":"current_trip_pace","value":"fast"},"memory_tier":"short_term","memory_domain":"user","memory_kind":"semantic","scope":{"domain":"travel","applies_when":["trip_hangzhou_001"],"topic":"travel_pacing"},"evidence_kind":"explicit_statement","confidence":0.96,"salience":0.9,"retention":"current_trip","sensitivity":"normal"},
+      "recall": {"trip_id":"trip_beijing_001","topics":["travel_pacing"],"situation":{"trip_kind":"leisure_trip"}},
+      "expected": {"mutation":"CREATE","recall_count":0,"omitted_reason":"OUT_OF_SCOPE"}
+    },
+    {
+      "id": "M08",
+      "title": "相同证据强化而不重复创建",
+      "category": "update",
+      "seed_memory_ids": ["mem_photography"],
+      "event": {"id":"m08_evt","type":"feedback.user_confirmed","description":"对，我旅行时确实很喜欢摄影和建筑"},
+      "candidate": {"statement":{"subject":"user","predicate":"likes_experience","value":"photography_and_architecture"},"memory_tier":"long_term","memory_domain":"user","memory_kind":"semantic","scope":{"domain":"travel"},"evidence_kind":"explicit_statement","confidence":0.96,"salience":0.9,"retention":"long_term_candidate","sensitivity":"normal"},
+      "expected": {"mutation":"REINFORCE","memory_count":1}
+    }
+  ]
+}

@@ -1,0 +1,20 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://sageflow.local/schemas/action-candidate.schema.json",
+  "title": "ActionCandidate",
+  "type": "object",
+  "required": ["action_id", "action_type", "target", "channel", "expected_user_value", "interruption_cost", "risk", "urgency", "requires_confirmation", "reason_codes"],
+  "properties": {
+    "action_id": {"type": "string"},
+    "action_type": {"type": "string"},
+    "target": {"type": "string"},
+    "channel": {"type": "string"},
+    "expected_user_value": {"type": "number", "minimum": 0, "maximum": 1},
+    "interruption_cost": {"type": "number", "minimum": 0, "maximum": 1},
+    "risk": {"type": "number", "minimum": 0, "maximum": 1},
+    "urgency": {"type": "number", "minimum": 0, "maximum": 1},
+    "requires_confirmation": {"type": "boolean"},
+    "reason_codes": {"type": "array", "items": {"type": "string"}}
+  },
+  "additionalProperties": true
+}

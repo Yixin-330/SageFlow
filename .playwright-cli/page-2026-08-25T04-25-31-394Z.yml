@@ -1,0 +1,239 @@
+- generic [ref=f1e2]:
+  - banner [ref=f1e235]:
+    - link "SageFlow 首页" [ref=f1e236] [cursor=pointer]:
+      - /url: /prototype/
+      - generic [ref=f1e237]: S
+      - generic [ref=f1e238]:
+        - generic [ref=f1e239]: SageFlow
+        - generic [ref=f1e240]: 长期关系智能原型
+    - navigation "原型区域" [ref=f1e241]:
+      - generic [ref=f1e242]: 情境模拟器
+      - generic [ref=f1e243]: Traveler App
+      - generic [ref=f1e244]: 评测
+    - generic [ref=f1e245]: PROTOTYPE · 模拟数据
+  - main [ref=f1e247]:
+    - generic [ref=f1e248]:
+      - generic [ref=f1e249]:
+        - text: SCENARIO LAB · VARIANT A
+        - heading "让同一段旅程，跑出三种智能差异" [level=1] [ref=f1e250]
+        - paragraph [ref=f1e251]: 控制事件，观察记忆、状态与主动决策如何改变下一步。
+      - generic [ref=f1e252]:
+        - generic [ref=f1e254]: 虚拟时钟
+        - generic [ref=f1e255]: 14:20
+    - generic [ref=f1e256]:
+      - complementary [ref=f1e257]:
+        - generic [ref=f1e258]:
+          - generic [ref=f1e259]: SCENARIO
+          - generic [ref=f1e260]: 典型用户故事
+          - combobox "典型用户故事" [ref=f1e261] [cursor=pointer]:
+            - option "S01 · 雨势逼近，体力接近上限" [selected]
+            - option "S02 · 长期偏好遇到今天的明确意图"
+            - option "S03 · 有疲劳迹象，但证据不足"
+            - option "S04 · 连续忽略后的克制"
+            - option "S05 · 亲子同行的休息窗口"
+            - option "S06 · 高匹配推荐超出预算"
+            - option "S07 · 两条节奏记忆发生冲突"
+            - option "S08 · 延迟到达的过期天气"
+          - paragraph [ref=f1e262]: 强降雨、较高步行量与闭馆压力共同出现，存在高匹配室内替代项。
+          - generic [ref=f1e263]:
+            - generic [ref=f1e264]: 林
+            - generic [ref=f1e265]:
+              - generic [ref=f1e266]: 林予安
+              - generic [ref=f1e267]: 杭州独行 · 第 2 天 · 独自
+        - generic [ref=f1e268]:
+          - generic [ref=f1e269]:
+            - generic [ref=f1e270]: 情境控制
+            - generic [ref=f1e272]: 3/3
+          - generic [ref=f1e273]:
+            - generic [ref=f1e274]:
+              - generic [ref=f1e275]: 时间
+              - generic [ref=f1e276]: 14:20
+            - generic [ref=f1e277]:
+              - generic [ref=f1e278]: 位置
+              - generic [ref=f1e279]: 西湖边
+            - generic [ref=f1e280]:
+              - generic [ref=f1e281]: 天气
+              - generic [ref=f1e282]: 强降雨预警
+            - generic [ref=f1e283]:
+              - generic [ref=f1e284]: 步数
+              - generic [ref=f1e285]: 11,500 步
+            - generic [ref=f1e286]:
+              - generic [ref=f1e287]: 下一安排
+              - generic [ref=f1e288]: 步行前往户外园林
+            - generic [ref=f1e289]:
+              - generic [ref=f1e290]: 提醒历史
+              - generic [ref=f1e291]: 1 次忽略
+          - generic [ref=f1e292]:
+            - generic [ref=f1e293]: 事件流已完成
+            - generic [ref=f1e294]: 可以注入反馈或重置回放
+          - generic [ref=f1e295]:
+            - button "注入下一事件 →" [disabled] [ref=f1e296]
+            - button "运行全部" [disabled] [ref=f1e297]
+            - button "↺" [ref=f1e298] [cursor=pointer]
+          - paragraph [ref=f1e299]: 已运行全部事件，可以比较决策并注入反馈。
+        - generic [ref=f1e300]:
+          - generic [ref=f1e301]: 事件时间线
+          - list [ref=f1e303]:
+            - listitem [ref=f1e304]:
+              - time [ref=f1e306]: 14:05
+              - generic [ref=f1e307]:
+                - generic [ref=f1e308]: 载入旅行情境
+                - generic [ref=f1e309]: 西湖边 · 多云
+            - listitem [ref=f1e310]:
+              - time [ref=f1e312]: 14:15
+              - generic [ref=f1e313]: 今日步数达到 11,500
+            - listitem [ref=f1e315]:
+              - time [ref=f1e317]: 14:20
+              - generic [ref=f1e318]: 15:00 开始强降雨
+            - listitem [ref=f1e320]:
+              - time [ref=f1e322]: 14:21
+              - generic [ref=f1e323]: 原景点 16:30 停止入场
+      - generic [ref=f1e325]:
+        - generic [ref=f1e326]:
+          - generic [ref=f1e327]: MODE COMPARISON
+          - generic [ref=f1e328]: 相同输入 · 不同能力边界
+        - generic [ref=f1e329]:
+          - article [ref=f1e330] [cursor=pointer]:
+            - generic [ref=f1e331]:
+              - generic [ref=f1e332]:
+                - generic [ref=f1e333]: "01"
+                - generic [ref=f1e334]: Baseline
+              - generic [ref=f1e335]: 当前事实
+            - paragraph [ref=f1e336]: 只使用当前情境，不使用历史记忆。
+            - generic [ref=f1e337]: 天气提醒
+            - blockquote [ref=f1e339]: 当前天气可能影响户外安排，建议携带雨具并关注营业时间。
+            - generic [ref=f1e340]:
+              - generic [ref=f1e341]: 理由
+              - paragraph [ref=f1e342]: 仅依据当前可观察事实生成响应。
+            - button "查看决策证据 ↗" [ref=f1e343]:
+              - text: 查看决策证据
+              - generic [ref=f1e344]: ↗
+          - article [ref=f1e345] [cursor=pointer]:
+            - generic [ref=f1e346]:
+              - generic [ref=f1e347]:
+                - generic [ref=f1e348]: "02"
+                - generic [ref=f1e349]: Memory
+              - generic [ref=f1e350]: 事实 + 记忆
+            - paragraph [ref=f1e351]: 召回长期理解，但不进行状态推断和主动策略控制。
+            - generic [ref=f1e352]: 兴趣推荐
+            - blockquote [ref=f1e354]: 天气可能影响户外安排。你喜欢摄影，可以考虑附近的湖畔摄影展。
+            - generic [ref=f1e355]:
+              - generic [ref=f1e356]: 理由
+              - paragraph [ref=f1e357]: 使用当前事实和召回记忆，但不推断动态状态。
+            - button "查看决策证据 ↗" [ref=f1e358]:
+              - text: 查看决策证据
+              - generic [ref=f1e359]: ↗
+          - article [ref=f1e360] [cursor=pointer]:
+            - generic [ref=f1e361]:
+              - generic [ref=f1e362]:
+                - generic [ref=f1e363]: "03"
+                - generic [ref=f1e364]: SageFlow
+              - generic [ref=f1e365]: 记忆 + 状态 + 决策
+            - paragraph [ref=f1e366]: 综合证据、打扰成本和约束，允许主动行动或静默。
+            - generic [ref=f1e367]: 提议调整
+            - blockquote [ref=f1e369]: 15:00 后的雨可能让原计划变得很赶，你上午的步行量也接近平时舒适上限。可以改去湖畔摄影展，户外园林移到明天；是否调整由你确认。
+            - generic [ref=f1e370]:
+              - generic [ref=f1e371]: 理由
+              - paragraph [ref=f1e372]: 行动收益在天气、时间、体力与偏好证据共同支持下超过打扰成本。
+            - button "查看决策证据 ↗" [ref=f1e373]:
+              - text: 查看决策证据
+              - generic [ref=f1e374]: ↗
+        - generic [ref=f1e375]:
+          - generic [ref=f1e376]:
+            - generic [ref=f1e377]: 模拟真实反馈
+            - generic [ref=f1e378]: 反馈只记录结果，不直接假设原因
+          - generic [ref=f1e379]:
+            - button "✓ 接受" [ref=f1e380] [cursor=pointer]
+            - button "× 拒绝" [ref=f1e381] [cursor=pointer]
+            - button "— 忽略" [ref=f1e382] [cursor=pointer]
+            - button "✎ 纠正：今天想多走走" [ref=f1e383] [cursor=pointer]
+          - generic [ref=f1e384]: 尚未注入反馈
+        - generic [ref=f1e385]:
+          - generic [ref=f1e386]:
+            - generic [ref=f1e387]:
+              - text: 同步评测
+              - generic [ref=f1e388]: 确定性模拟回归
+            - generic [ref=f1e389]: 8/8 场景通过
+          - generic [ref=f1e391]:
+            - generic [ref=f1e392]:
+              - text: 数据协议
+              - generic [ref=f1e393]: 8/8
+            - generic [ref=f1e396]:
+              - text: 记忆召回
+              - generic [ref=f1e397]: 8/8
+            - generic [ref=f1e400]:
+              - text: 状态模型
+              - generic [ref=f1e401]: 8/8
+            - generic [ref=f1e404]:
+              - text: 主动决策
+              - generic [ref=f1e405]: 8/8
+            - generic [ref=f1e408]:
+              - text: 反馈闭环
+              - generic [ref=f1e409]: 8/8
+          - paragraph [ref=f1e412]: 这些结果验证协议与金标断言是否一致，不代表真实模型准确率或真实用户效果。
+      - complementary [ref=f1e413]:
+        - generic [ref=f1e414]:
+          - generic [ref=f1e415]:
+            - generic [ref=f1e416]: 决策透视
+            - generic [ref=f1e417]:
+              - button "Baseline" [ref=f1e418] [cursor=pointer]
+              - button "Memory" [ref=f1e419] [cursor=pointer]
+              - button "SageFlow" [ref=f1e420] [cursor=pointer]
+          - generic [ref=f1e421]:
+            - generic [ref=f1e422]: Memory
+            - generic [ref=f1e423]: State
+            - generic [ref=f1e424]: Decision
+          - generic [ref=f1e425]:
+            - heading "召回记忆 3" [level=3] [ref=f1e426]:
+              - text: 召回记忆
+              - generic [ref=f1e427]: "3"
+            - generic [ref=f1e428]:
+              - generic [ref=f1e429]:
+                - generic [ref=f1e430]:
+                  - generic [ref=f1e431]: 长期
+                  - generic [ref=f1e432]: 84%
+                - paragraph [ref=f1e433]: 通常偏好松弛、不赶路的旅行节奏
+                - text: mem_slow_pace
+              - generic [ref=f1e434]:
+                - generic [ref=f1e435]:
+                  - generic [ref=f1e436]: 长期
+                  - generic [ref=f1e437]: 89%
+                - paragraph [ref=f1e438]: 偏好摄影、建筑与本地文化体验
+                - text: mem_photography
+              - generic [ref=f1e439]:
+                - generic [ref=f1e440]:
+                  - generic [ref=f1e441]: 关系
+                  - generic [ref=f1e442]: 81%
+                - paragraph [ref=f1e443]: 不喜欢连续收到低价值提醒
+                - text: mem_low_interrupt
+          - generic [ref=f1e444]:
+            - heading "当前状态 3" [level=3] [ref=f1e445]:
+              - text: 当前状态
+              - generic [ref=f1e446]: "3"
+            - generic [ref=f1e447]:
+              - generic [ref=f1e448]:
+                - generic [ref=f1e449]: 疲劳
+                - generic [ref=f1e450]: high
+                - emphasis [ref=f1e451]: 74%
+                - generic [ref=f1e452]: S01_evt_steps
+              - generic [ref=f1e453]:
+                - generic [ref=f1e454]: 时间压力
+                - generic [ref=f1e455]: high
+                - emphasis [ref=f1e456]: 89%
+                - generic [ref=f1e457]: S01_evt_weather · S01_evt_closing
+              - generic [ref=f1e458]:
+                - generic [ref=f1e459]: 打扰容忍
+                - generic [ref=f1e460]: medium
+                - emphasis [ref=f1e461]: 68%
+                - generic [ref=f1e462]: mem_low_interrupt
+          - generic [ref=f1e463]:
+            - heading "最终选择" [level=3] [ref=f1e464]
+            - text: 提议调整
+            - paragraph [ref=f1e465]: 行动收益在天气、时间、体力与偏好证据共同支持下超过打扰成本。
+            - text: HEAVY_RAIN_EXPECTED · OUTDOOR_PLAN_AT_RISK · USER_PREFERS_SLOW_PACE · MATCHED_INDOOR_OPTION
+  - navigation "原型变体切换" [ref=f1e466]:
+    - button "上一个变体" [ref=f1e467] [cursor=pointer]: ←
+    - generic [ref=f1e468]:
+      - generic [ref=f1e469]: 界面原型
+      - generic [ref=f1e470]: A · 决策驾驶舱
+    - button "下一个变体" [ref=f1e471] [cursor=pointer]: →

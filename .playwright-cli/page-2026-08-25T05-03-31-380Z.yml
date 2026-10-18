@@ -1,0 +1,287 @@
+- generic [ref=e2]:
+  - banner [ref=e294]:
+    - link "SageFlow 首页" [ref=e295] [cursor=pointer]:
+      - /url: /prototype/
+      - generic [ref=e296]: S
+      - generic [ref=e297]:
+        - generic [ref=e298]: SageFlow
+        - generic [ref=e299]: 长期关系智能原型
+    - navigation "原型区域" [ref=e300]:
+      - generic [ref=e301]: 情境模拟器
+      - generic [ref=e302]: Traveler App
+      - generic [ref=e303]: 评测
+    - generic [ref=e304]: PROTOTYPE · 模拟数据
+  - main [ref=e306]:
+    - generic [ref=e307]:
+      - generic [ref=e308]:
+        - text: SCENARIO LAB · VARIANT A
+        - heading "让同一段旅程，跑出三种智能差异" [level=1] [ref=e309]
+        - paragraph [ref=e310]: 控制事件，观察记忆、状态与主动决策如何改变下一步。
+      - generic [ref=e311]:
+        - generic [ref=e313]: 虚拟时钟
+        - generic [ref=e314]: 14:15
+    - generic [ref=e315]:
+      - complementary [ref=e316]:
+        - generic [ref=e317]:
+          - generic [ref=e318]: SCENARIO
+          - generic [ref=e319]: 典型用户故事
+          - combobox "典型用户故事" [ref=e320] [cursor=pointer]:
+            - option "S01 · 雨势逼近，体力接近上限"
+            - option "S02 · 长期偏好遇到今天的明确意图" [selected]
+            - option "S03 · 有疲劳迹象，但证据不足"
+            - option "S04 · 连续忽略后的克制"
+            - option "S05 · 亲子同行的休息窗口"
+            - option "S06 · 高匹配推荐超出预算"
+            - option "S07 · 两条节奏记忆发生冲突"
+            - option "S08 · 延迟到达的过期天气"
+          - paragraph [ref=e321]: 外部条件与 S01 接近，但用户明确表示今天体力很好并想继续户外行程。
+          - generic [ref=e322]:
+            - generic [ref=e323]: 林
+            - generic [ref=e324]:
+              - generic [ref=e325]: 林予安
+              - generic [ref=e326]: 杭州独行 · 第 2 天 · 独自
+        - generic [ref=e327]:
+          - generic [ref=e328]:
+            - generic [ref=e329]: 情境控制
+            - generic [ref=e331]: 0/1
+          - generic [ref=e332]:
+            - generic [ref=e333]:
+              - generic [ref=e334]: 时间
+              - generic [ref=e335]: 14:15
+            - generic [ref=e336]:
+              - generic [ref=e337]: 位置
+              - generic [ref=e338]: 西湖边
+            - generic [ref=e339]:
+              - generic [ref=e340]: 天气
+              - generic [ref=e341]: 多云
+            - generic [ref=e342]:
+              - generic [ref=e343]: 步数
+              - generic [ref=e344]: 11,500 步
+            - generic [ref=e345]:
+              - generic [ref=e346]: 下一安排
+              - generic [ref=e347]: 步行前往户外园林
+            - generic [ref=e348]:
+              - generic [ref=e349]: 提醒历史
+              - generic [ref=e350]: 0 次忽略
+          - generic [ref=e351]:
+            - generic [ref=e352]: 下一事件
+            - generic [ref=e353]: 我今天状态很好，就是想多走走
+          - generic [ref=e354]:
+            - button "注入下一事件 →" [ref=e355] [cursor=pointer]
+            - button "运行全部" [ref=e356] [cursor=pointer]
+            - button "↺" [ref=e357] [cursor=pointer]
+          - paragraph [ref=e358]: 已回到场景起点。
+        - generic [ref=e359]:
+          - generic [ref=e360]: 事件时间线
+          - list [ref=e362]:
+            - listitem [ref=e363]:
+              - time [ref=e365]: 14:15
+              - generic [ref=e366]:
+                - generic [ref=e367]: 载入旅行情境
+                - generic [ref=e368]: 西湖边 · 多云
+            - listitem [ref=e369]:
+              - time [ref=e371]: 14:20
+              - generic [ref=e372]: 我今天状态很好，就是想多走走
+      - generic [ref=e374]:
+        - generic [ref=e375]:
+          - generic [ref=e376]: MODE COMPARISON
+          - generic [ref=e377]: 相同输入 · 不同能力边界
+        - generic [ref=e378]:
+          - article [ref=e379] [cursor=pointer]:
+            - generic [ref=e380]:
+              - generic [ref=e381]:
+                - generic [ref=e382]: "01"
+                - generic [ref=e383]: Baseline
+              - generic [ref=e384]: 当前事实
+            - paragraph [ref=e385]: 只使用当前情境，不使用历史记忆。
+            - generic [ref=e386]: 天气提醒
+            - blockquote [ref=e388]: 当前天气可能影响户外安排，建议携带雨具并关注营业时间。
+            - generic [ref=e389]:
+              - generic [ref=e390]: 理由
+              - paragraph [ref=e391]: 仅依据当前可观察事实生成响应。
+            - button "查看决策证据 ↗" [ref=e392]:
+              - text: 查看决策证据
+              - generic [ref=e393]: ↗
+          - article [ref=e394] [cursor=pointer]:
+            - generic [ref=e395]:
+              - generic [ref=e396]:
+                - generic [ref=e397]: "02"
+                - generic [ref=e398]: Memory
+              - generic [ref=e399]: 事实 + 记忆
+            - paragraph [ref=e400]: 召回长期理解，但不进行状态推断和主动策略控制。
+            - generic [ref=e401]: 兴趣推荐
+            - blockquote [ref=e403]: 天气可能影响户外安排。你喜欢摄影，可以考虑附近的湖畔摄影展。
+            - generic [ref=e404]:
+              - generic [ref=e405]: 理由
+              - paragraph [ref=e406]: 使用当前事实和召回记忆，但不推断动态状态。
+            - button "查看决策证据 ↗" [ref=e407]:
+              - text: 查看决策证据
+              - generic [ref=e408]: ↗
+          - article [ref=e409] [cursor=pointer]:
+            - generic [ref=e410]:
+              - generic [ref=e411]:
+                - generic [ref=e412]: "03"
+                - generic [ref=e413]: SageFlow
+              - generic [ref=e414]: 记忆 + 状态 + 决策
+            - paragraph [ref=e415]: 综合证据、打扰成本和约束，允许主动行动或静默。
+            - generic [ref=e416]: 提议调整
+            - blockquote [ref=e418]: 15:00 后的雨可能让原计划变得很赶，你上午的步行量也接近平时舒适上限。可以改去湖畔摄影展，户外园林移到明天；是否调整由你确认。
+            - generic [ref=e419]:
+              - generic [ref=e420]: 理由
+              - paragraph [ref=e421]: 行动收益在天气、时间、体力与偏好证据共同支持下超过打扰成本。
+            - button "查看决策证据 ↗" [ref=e422]:
+              - text: 查看决策证据
+              - generic [ref=e423]: ↗
+        - generic [ref=e424]:
+          - generic [ref=e425]:
+            - generic [ref=e426]: 模拟真实反馈
+            - generic [ref=e427]: 反馈只记录结果，不直接假设原因
+          - generic [ref=e428]:
+            - button "✓ 接受" [ref=e429] [cursor=pointer]
+            - button "× 拒绝" [ref=e430] [cursor=pointer]
+            - button "— 忽略" [ref=e431] [cursor=pointer]
+            - button "✎ 纠正：今天想多走走" [ref=e432] [cursor=pointer]
+          - generic [ref=e433]: 尚未注入反馈
+        - generic [ref=e434]:
+          - generic [ref=e435]:
+            - generic [ref=e436]:
+              - text: 同步评测
+              - generic [ref=e437]: 确定性模拟回归
+            - generic [ref=e438]: 8/8 场景通过
+          - generic [ref=e440]:
+            - generic [ref=e441]:
+              - text: 数据协议
+              - generic [ref=e442]: 8/8
+            - generic [ref=e445]:
+              - text: 记忆召回
+              - generic [ref=e446]: 8/8
+            - generic [ref=e449]:
+              - text: 状态模型
+              - generic [ref=e450]: 8/8
+            - generic [ref=e453]:
+              - text: 主动决策
+              - generic [ref=e454]: 8/8
+            - generic [ref=e457]:
+              - text: 反馈闭环
+              - generic [ref=e458]: 8/8
+          - paragraph [ref=e461]: 这些结果验证协议与金标断言是否一致，不代表真实模型准确率或真实用户效果。
+        - generic [ref=e462]:
+          - generic [ref=e463]:
+            - generic [ref=e464]:
+              - text: 第二阶段 · Memory Engine
+              - generic [ref=e465]: 接口行为回归
+            - generic [ref=e466]: 8/8 通过
+          - generic [ref=e468]:
+            - generic [ref=e469]:
+              - generic [ref=e470]: 抽取
+              - generic [ref=e471]: 1/1
+            - generic [ref=e472]:
+              - generic [ref=e473]: 范围
+              - generic [ref=e474]: 1/1
+            - generic [ref=e475]:
+              - generic [ref=e476]: 反馈
+              - generic [ref=e477]: 1/1
+            - generic [ref=e478]:
+              - generic [ref=e479]: 冲突
+              - generic [ref=e480]: 1/1
+            - generic [ref=e481]:
+              - generic [ref=e482]: 纠正
+              - generic [ref=e483]: 1/1
+            - generic [ref=e484]:
+              - generic [ref=e485]: 隐私
+              - generic [ref=e486]: 1/1
+            - generic [ref=e487]:
+              - generic [ref=e488]: 召回
+              - generic [ref=e489]: 1/1
+            - generic [ref=e490]:
+              - generic [ref=e491]: 更新
+              - generic [ref=e492]: 1/1
+          - generic [ref=e493]:
+            - generic [ref=e494]: 人工语义评测
+            - generic [ref=e495]: 0/6 已复核
+            - generic [ref=e496]: 6 条待双人独立标注；自动通过不替代人工金标。
+      - complementary [ref=e497]:
+        - generic [ref=e498]:
+          - generic [ref=e499]:
+            - generic [ref=e500]: 决策透视
+            - generic [ref=e501]:
+              - button "Baseline" [ref=e502] [cursor=pointer]
+              - button "Memory" [ref=e503] [cursor=pointer]
+              - button "SageFlow" [ref=e504] [cursor=pointer]
+          - generic [ref=e505]:
+            - generic [ref=e506]: Memory
+            - generic [ref=e507]: State
+            - generic [ref=e508]: Decision
+          - generic [ref=e509]:
+            - heading "Memory Engine 轨迹 observe → recall" [level=3] [ref=e510]:
+              - text: Memory Engine 轨迹
+              - generic [ref=e511]: observe → recall
+            - generic [ref=e512]:
+              - generic [ref=e513]:
+                - generic [ref=e514]: 候选
+                - generic [ref=e515]: "0"
+              - generic [ref=e516]:
+                - generic [ref=e517]: 变更
+                - generic [ref=e518]: "0"
+              - generic [ref=e519]:
+                - generic [ref=e520]: 冲突
+                - generic [ref=e521]: "0"
+              - generic [ref=e522]:
+                - generic [ref=e523]: 排除
+                - generic [ref=e524]: "0"
+            - paragraph [ref=e525]: 尚未产生新的 Memory Mutation；当前显示初始记忆召回。
+            - generic [ref=e526]:
+              - generic [ref=e527]:
+                - generic [ref=e528]: "0.90"
+                - text: 偏好摄影、建筑与本地文化体验
+              - generic [ref=e529]:
+                - generic [ref=e530]: "0.84"
+                - text: 通常偏好松弛、不赶路的旅行节奏
+          - generic [ref=e531]:
+            - heading "召回记忆 2" [level=3] [ref=e532]:
+              - text: 召回记忆
+              - generic [ref=e533]: "2"
+            - generic [ref=e534]:
+              - generic [ref=e535]:
+                - generic [ref=e536]:
+                  - generic [ref=e537]: 长期
+                  - generic [ref=e538]: 89%
+                - paragraph [ref=e539]: 偏好摄影、建筑与本地文化体验
+                - text: mem_photography
+              - generic [ref=e540]:
+                - generic [ref=e541]:
+                  - generic [ref=e542]: 长期
+                  - generic [ref=e543]: 84%
+                - paragraph [ref=e544]: 通常偏好松弛、不赶路的旅行节奏
+                - text: mem_slow_pace
+          - generic [ref=e545]:
+            - heading "当前状态 3" [level=3] [ref=e546]:
+              - text: 当前状态
+              - generic [ref=e547]: "3"
+            - generic [ref=e548]:
+              - generic [ref=e549]:
+                - generic [ref=e550]: 疲劳
+                - generic [ref=e551]: high
+                - emphasis [ref=e552]: 74%
+                - generic [ref=e553]: current_activity_summary
+              - generic [ref=e554]:
+                - generic [ref=e555]: 时间压力
+                - generic [ref=e556]: high
+                - emphasis [ref=e557]: 89%
+                - generic [ref=e558]: current_weather · current_itinerary
+              - generic [ref=e559]:
+                - generic [ref=e560]: 打扰容忍
+                - generic [ref=e561]: high
+                - emphasis [ref=e562]: 68%
+                - generic [ref=e563]: current_interaction_history
+          - generic [ref=e564]:
+            - heading "最终选择" [level=3] [ref=e565]
+            - text: 提议调整
+            - paragraph [ref=e566]: 行动收益在天气、时间、体力与偏好证据共同支持下超过打扰成本。
+            - text: HEAVY_RAIN_EXPECTED · OUTDOOR_PLAN_AT_RISK · USER_PREFERS_SLOW_PACE · MATCHED_INDOOR_OPTION
+  - navigation "原型变体切换" [ref=e567]:
+    - button "上一个变体" [ref=e568] [cursor=pointer]: ←
+    - generic [ref=e569]:
+      - generic [ref=e570]: 界面原型
+      - generic [ref=e571]: A · 决策驾驶舱
+    - button "下一个变体" [ref=e572] [cursor=pointer]: →

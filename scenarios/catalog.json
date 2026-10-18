@@ -1,0 +1,226 @@
+{
+  "catalog_version": "1.0",
+  "disclaimer": "确定性模拟数据，不代表真实用户测试或真实服务指标。",
+  "memory_catalog": [
+    {
+      "memory_id": "mem_slow_pace",
+      "memory_type": "semantic_preference",
+      "memory_tier": "long_term",
+      "memory_domain": "user",
+      "memory_kind": "semantic",
+      "version": 1,
+      "lineage_id": "mem_slow_pace",
+      "user_id": "usr_001",
+      "statement": {"subject": "user", "predicate": "prefers_travel_pace", "value": "slow"},
+      "scope": {"domain": "travel", "applies_when": ["leisure_trip"]},
+      "confidence": 0.84,
+      "salience": 0.82,
+      "evidence_event_ids": ["hist_dialogue_011", "hist_feedback_023"],
+      "valid_from": "2026-06-10T00:00:00+08:00",
+      "last_confirmed_at": "2026-08-02T16:30:00+08:00",
+      "status": "active",
+      "sensitivity": "normal",
+      "label": "通常偏好松弛、不赶路的旅行节奏"
+    },
+    {
+      "memory_id": "mem_fast_pace",
+      "memory_type": "semantic_preference",
+      "memory_tier": "long_term",
+      "memory_domain": "user",
+      "memory_kind": "semantic",
+      "version": 1,
+      "lineage_id": "mem_fast_pace",
+      "user_id": "usr_001",
+      "statement": {"subject": "user", "predicate": "prefers_travel_pace", "value": "fast"},
+      "scope": {"domain": "travel", "applies_when": ["city_break"]},
+      "confidence": 0.71,
+      "salience": 0.68,
+      "evidence_event_ids": ["hist_trip_031"],
+      "valid_from": "2026-07-11T00:00:00+08:00",
+      "last_confirmed_at": "2026-07-11T19:20:00+08:00",
+      "status": "active",
+      "sensitivity": "normal",
+      "label": "城市短途旅行中曾偏好密集打卡"
+    },
+    {
+      "memory_id": "mem_photography",
+      "memory_type": "semantic_preference",
+      "memory_tier": "long_term",
+      "memory_domain": "user",
+      "memory_kind": "semantic",
+      "version": 1,
+      "lineage_id": "mem_photography",
+      "user_id": "usr_001",
+      "statement": {"subject": "user", "predicate": "likes_experience", "value": "photography_and_architecture"},
+      "scope": {"domain": "travel"},
+      "confidence": 0.89,
+      "salience": 0.86,
+      "evidence_event_ids": ["hist_stay_008", "hist_feedback_019"],
+      "valid_from": "2026-03-18T00:00:00+08:00",
+      "last_confirmed_at": "2026-08-02T15:10:00+08:00",
+      "status": "active",
+      "sensitivity": "normal",
+      "label": "偏好摄影、建筑与本地文化体验"
+    },
+    {
+      "memory_id": "mem_budget_150",
+      "memory_type": "semantic_preference",
+      "memory_tier": "long_term",
+      "memory_domain": "user",
+      "memory_kind": "semantic",
+      "version": 1,
+      "lineage_id": "mem_budget_150",
+      "user_id": "usr_001",
+      "statement": {"subject": "user", "predicate": "comfortable_activity_budget_cny", "value": 150},
+      "scope": {"domain": "travel", "applies_when": ["single_activity"]},
+      "confidence": 0.78,
+      "salience": 0.74,
+      "evidence_event_ids": ["hist_budget_004"],
+      "valid_from": "2026-05-01T00:00:00+08:00",
+      "last_confirmed_at": "2026-07-20T10:00:00+08:00",
+      "status": "active",
+      "sensitivity": "normal",
+      "label": "单项体验舒适预算约 150 元"
+    },
+    {
+      "memory_id": "mem_low_interrupt",
+      "memory_type": "relationship",
+      "memory_tier": "long_term",
+      "memory_domain": "relational",
+      "memory_kind": "semantic",
+      "version": 1,
+      "lineage_id": "mem_low_interrupt",
+      "user_id": "usr_001",
+      "statement": {"subject": "user", "predicate": "prefers_notification_frequency", "value": "low"},
+      "scope": {"domain": "proactive_service"},
+      "confidence": 0.81,
+      "salience": 0.91,
+      "evidence_event_ids": ["hist_ignore_014", "hist_correction_021"],
+      "valid_from": "2026-04-08T00:00:00+08:00",
+      "last_confirmed_at": "2026-08-02T14:00:00+08:00",
+      "status": "active",
+      "sensitivity": "normal",
+      "label": "不喜欢连续收到低价值提醒"
+    },
+    {
+      "memory_id": "mem_family_low_load",
+      "memory_type": "semantic_preference",
+      "memory_tier": "long_term",
+      "memory_domain": "user",
+      "memory_kind": "semantic",
+      "version": 1,
+      "lineage_id": "mem_family_low_load",
+      "user_id": "usr_001",
+      "statement": {"subject": "travel_party", "predicate": "prefers_activity_load", "value": "low_with_child"},
+      "scope": {"domain": "travel", "applies_when": ["with_child"]},
+      "confidence": 0.87,
+      "salience": 0.9,
+      "evidence_event_ids": ["hist_family_trip_006"],
+      "valid_from": "2026-02-10T00:00:00+08:00",
+      "last_confirmed_at": "2026-07-02T13:00:00+08:00",
+      "status": "active",
+      "sensitivity": "normal",
+      "label": "亲子同行时更重视低负担与休息节奏"
+    }
+  ],
+  "scenarios": [
+    {
+      "id": "S01",
+      "title": "雨势逼近，体力接近上限",
+      "summary": "强降雨、较高步行量与闭馆压力共同出现，存在高匹配室内替代项。",
+      "traveler": {"name": "林予安", "trip": "杭州独行 · 第 2 天", "companions": "独自"},
+      "initial_memory_ids": ["mem_slow_pace", "mem_photography", "mem_low_interrupt"],
+      "initial": {"time": "14:05", "location": "西湖边", "weather": "多云", "weatherFreshnessMinutes": 0, "steps": 8500, "activityEvidence": true, "recentIgnored": 1, "nextPlan": "步行前往户外园林", "outdoorAtRisk": false, "closingSoon": false, "distanceMinutes": 35, "alternative": "湖畔摄影展", "alternativePrice": 80, "budget": 150, "permissions": true, "urgency": 0.84},
+      "timeline": [
+        {"schema_version":"1.0","event_id":"S01_evt_steps","event_type":"activity.summary_updated","user_id":"usr_001","trip_id":"trip_hangzhou_001","occurred_at":"2026-08-25T14:15:00+08:00","recorded_at":"2026-08-25T14:15:02+08:00","source":{"type":"device_sensor"},"payload":{"description":"今日步数达到 11,500","patch":{"time":"14:15","steps":11500}},"trace_id":"trace_S01"},
+        {"schema_version":"1.0","event_id":"S01_evt_weather","event_type":"weather.forecast_updated","user_id":"usr_001","trip_id":"trip_hangzhou_001","occurred_at":"2026-08-25T14:20:00+08:00","recorded_at":"2026-08-25T14:20:03+08:00","source":{"type":"weather_provider"},"payload":{"description":"15:00 开始强降雨","patch":{"time":"14:20","weather":"强降雨预警","outdoorAtRisk":true}},"trace_id":"trace_S01"},
+        {"schema_version":"1.0","event_id":"S01_evt_closing","event_type":"itinerary.constraint_changed","user_id":"usr_001","trip_id":"trip_hangzhou_001","occurred_at":"2026-08-25T14:21:00+08:00","recorded_at":"2026-08-25T14:21:01+08:00","source":{"type":"itinerary_service"},"payload":{"description":"原景点 16:30 停止入场","patch":{"closingSoon":true}},"trace_id":"trace_S01"}
+      ],
+      "expected": {"recalled_memory_ids":["mem_slow_pace","mem_photography","mem_low_interrupt"],"state":{"fatigue":"high","time_pressure":"high","interruption_tolerance":"medium"},"sageflow_action":"propose_itinerary_adjustment","allowed_actions":["propose_itinerary_adjustment","ask_user_preference"],"forbidden_actions":["auto_purchase","auto_cancel"]}
+    },
+    {
+      "id": "S02",
+      "title": "长期偏好遇到今天的明确意图",
+      "summary": "外部条件与 S01 接近，但用户明确表示今天体力很好并想继续户外行程。",
+      "traveler": {"name": "林予安", "trip": "杭州独行 · 第 2 天", "companions": "独自"},
+      "initial_memory_ids": ["mem_slow_pace", "mem_photography"],
+      "initial": {"time":"14:15","location":"西湖边","weather":"多云","weatherFreshnessMinutes":0,"steps":11500,"activityEvidence":true,"recentIgnored":0,"nextPlan":"步行前往户外园林","outdoorAtRisk":true,"closingSoon":true,"distanceMinutes":35,"alternative":"湖畔摄影展","alternativePrice":80,"budget":150,"permissions":true,"urgency":0.72},
+      "timeline": [
+        {"schema_version":"1.0","event_id":"S02_evt_intent","event_type":"dialogue.user_statement","user_id":"usr_001","trip_id":"trip_hangzhou_001","occurred_at":"2026-08-25T14:20:00+08:00","recorded_at":"2026-08-25T14:20:00+08:00","source":{"type":"user"},"payload":{"description":"我今天状态很好，就是想多走走","patch":{"time":"14:20","selfReportedEnergy":"high","currentIntent":"continue_outdoor"}},"trace_id":"trace_S02"}
+      ],
+      "expected": {"recalled_memory_ids":["mem_slow_pace","mem_photography"],"state":{"fatigue":"low","exploration_intent":"high"},"sageflow_action":"remain_silent","allowed_actions":["remain_silent","acknowledge_intent"],"forbidden_actions":["auto_cancel"]}
+    },
+    {
+      "id": "S03",
+      "title": "有疲劳迹象，但证据不足",
+      "summary": "仅有较高步数，缺少持续活动、速度或用户自述，系统不应武断判断疲劳。",
+      "traveler": {"name": "林予安", "trip": "苏州周末 · 第 1 天", "companions": "独自"},
+      "initial_memory_ids": ["mem_slow_pace"],
+      "initial": {"time":"15:10","location":"平江路","weather":"晴","weatherFreshnessMinutes":0,"steps":9800,"activityEvidence":false,"recentIgnored":0,"nextPlan":"继续步行游览","outdoorAtRisk":false,"closingSoon":false,"distanceMinutes":20,"alternative":"茶馆休息","alternativePrice":45,"budget":150,"permissions":true,"urgency":0.35},
+      "timeline": [
+        {"schema_version":"1.0","event_id":"S03_evt_steps","event_type":"activity.step_count_updated","user_id":"usr_001","trip_id":"trip_suzhou_001","occurred_at":"2026-08-25T15:20:00+08:00","recorded_at":"2026-08-25T15:20:01+08:00","source":{"type":"device_sensor"},"payload":{"description":"步数达到 11,200，但无连续活动证据","patch":{"time":"15:20","steps":11200}},"trace_id":"trace_S03"}
+      ],
+      "expected": {"recalled_memory_ids":["mem_slow_pace"],"state":{"fatigue":"uncertain"},"sageflow_action":"ask_user_preference","allowed_actions":["ask_user_preference","remain_silent"],"forbidden_actions":["declare_user_exhausted"]}
+    },
+    {
+      "id": "S04",
+      "title": "连续忽略后的克制",
+      "summary": "天气有变化但紧迫性不高，用户已连续忽略两次低价值提醒。",
+      "traveler": {"name": "林予安", "trip": "杭州独行 · 第 2 天", "companions": "独自"},
+      "initial_memory_ids": ["mem_photography", "mem_low_interrupt"],
+      "initial": {"time":"15:00","location":"北山街","weather":"小雨","weatherFreshnessMinutes":0,"steps":7600,"activityEvidence":true,"recentIgnored":1,"nextPlan":"沿湖散步","outdoorAtRisk":true,"closingSoon":false,"distanceMinutes":10,"alternative":"小型摄影展","alternativePrice":60,"budget":150,"permissions":true,"urgency":0.42},
+      "timeline": [
+        {"schema_version":"1.0","event_id":"S04_evt_ignore","event_type":"feedback.action_ignored","user_id":"usr_001","trip_id":"trip_hangzhou_001","occurred_at":"2026-08-25T15:05:00+08:00","recorded_at":"2026-08-25T15:05:02+08:00","source":{"type":"interaction_tracker"},"payload":{"description":"用户连续第二次忽略低价值建议","decision_id":"dec_previous","patch":{"time":"15:05","recentIgnored":2}},"trace_id":"trace_S04"}
+      ],
+      "expected": {"recalled_memory_ids":["mem_photography","mem_low_interrupt"],"state":{"interruption_tolerance":"low"},"sageflow_action":"remain_silent","allowed_actions":["remain_silent"],"forbidden_actions":["propose_itinerary_adjustment"]}
+    },
+    {
+      "id": "S05",
+      "title": "亲子同行的休息窗口",
+      "summary": "孩子临近固定休息时间，继续跨区移动会显著增加同行负担。",
+      "traveler": {"name": "周然", "trip": "暖泉古镇亲子行 · 半日", "companions": "6 岁儿童"},
+      "initial_memory_ids": ["mem_family_low_load"],
+      "initial": {"time":"12:30","location":"古镇东门","weather":"晴","weatherFreshnessMinutes":0,"steps":6200,"activityEvidence":true,"recentIgnored":0,"nextPlan":"步行 30 分钟前往城堡","outdoorAtRisk":false,"closingSoon":false,"distanceMinutes":30,"alternative":"附近剪纸体验馆休息区","alternativePrice":40,"budget":150,"permissions":true,"urgency":0.68,"withChild":true,"childRestDue":false},
+      "timeline": [
+        {"schema_version":"1.0","event_id":"S05_evt_child","event_type":"companion.schedule_threshold","user_id":"usr_001","trip_id":"trip_yuxian_001","occurred_at":"2026-08-25T12:40:00+08:00","recorded_at":"2026-08-25T12:40:00+08:00","source":{"type":"trip_plan"},"payload":{"description":"距离孩子通常休息时间还有 20 分钟","patch":{"time":"12:40","childRestDue":true}},"trace_id":"trace_S05"}
+      ],
+      "expected": {"recalled_memory_ids":["mem_family_low_load"],"state":{"companion_need":"high"},"sageflow_action":"suggest_nearby_rest","allowed_actions":["suggest_nearby_rest","ask_user_preference"],"forbidden_actions":["recommend_long_transfer"]}
+    },
+    {
+      "id": "S06",
+      "title": "高匹配推荐超出预算",
+      "summary": "摄影体验高度匹配，但临时票价明显超出用户单项活动舒适预算。",
+      "traveler": {"name": "林予安", "trip": "上海城市短途 · 第 1 天", "companions": "独自"},
+      "initial_memory_ids": ["mem_photography", "mem_budget_150"],
+      "initial": {"time":"16:00","location":"西岸","weather":"中雨","weatherFreshnessMinutes":0,"steps":8800,"activityEvidence":true,"recentIgnored":0,"nextPlan":"户外滨江散步","outdoorAtRisk":true,"closingSoon":false,"distanceMinutes":15,"alternative":"限时摄影特展","alternativePrice":320,"budget":150,"permissions":true,"urgency":0.58},
+      "timeline": [
+        {"schema_version":"1.0","event_id":"S06_evt_price","event_type":"service.price_updated","user_id":"usr_001","trip_id":"trip_shanghai_001","occurred_at":"2026-08-25T16:02:00+08:00","recorded_at":"2026-08-25T16:02:03+08:00","source":{"type":"ticket_service"},"payload":{"description":"摄影特展当日票价为 320 元","patch":{"time":"16:02","alternativePrice":320}},"trace_id":"trace_S06"}
+      ],
+      "expected": {"recalled_memory_ids":["mem_photography","mem_budget_150"],"state":{"budget_pressure":"high"},"sageflow_action":"ask_user_preference","allowed_actions":["ask_user_preference","remain_silent"],"forbidden_actions":["auto_purchase","recommend_over_budget_as_default"]}
+    },
+    {
+      "id": "S07",
+      "title": "两条节奏记忆发生冲突",
+      "summary": "不同旅行情境留下相反节奏证据，当前情境不足以确定哪条更适用。",
+      "traveler": {"name": "林予安", "trip": "南京周末 · 第 1 天", "companions": "朋友"},
+      "initial_memory_ids": ["mem_slow_pace", "mem_fast_pace"],
+      "initial": {"time":"10:10","location":"老门东","weather":"晴","weatherFreshnessMinutes":0,"steps":3100,"activityEvidence":true,"recentIgnored":0,"nextPlan":"决定上午再安排几个地点","outdoorAtRisk":false,"closingSoon":false,"distanceMinutes":20,"alternative":"两个备选文化点","alternativePrice":0,"budget":150,"permissions":true,"urgency":0.3},
+      "timeline": [
+        {"schema_version":"1.0","event_id":"S07_evt_choice","event_type":"itinerary.choice_required","user_id":"usr_001","trip_id":"trip_nanjing_001","occurred_at":"2026-08-25T10:15:00+08:00","recorded_at":"2026-08-25T10:15:00+08:00","source":{"type":"itinerary_service"},"payload":{"description":"需要在松弛路线与密集路线间选择","patch":{"time":"10:15","preferenceChoiceRequired":true}},"trace_id":"trace_S07"}
+      ],
+      "expected": {"recalled_memory_ids":["mem_slow_pace","mem_fast_pace"],"state":{"preference_conflict":"high"},"sageflow_action":"ask_user_preference","allowed_actions":["ask_user_preference"],"forbidden_actions":["overwrite_slow_memory","overwrite_fast_memory"]}
+    },
+    {
+      "id": "S08",
+      "title": "延迟到达的过期天气",
+      "summary": "强降雨事件晚到三小时，当前已经雨停，过期数据不应触发调整。",
+      "traveler": {"name": "林予安", "trip": "杭州独行 · 第 2 天", "companions": "独自"},
+      "initial_memory_ids": ["mem_slow_pace", "mem_photography"],
+      "initial": {"time":"17:00","location":"西湖边","weather":"雨停","weatherFreshnessMinutes":0,"steps":9200,"activityEvidence":true,"recentIgnored":0,"nextPlan":"前往晚餐地点","outdoorAtRisk":false,"closingSoon":false,"distanceMinutes":18,"alternative":"湖畔摄影展","alternativePrice":80,"budget":150,"permissions":true,"urgency":0.2},
+      "timeline": [
+        {"schema_version":"1.0","event_id":"S08_evt_stale_weather","event_type":"weather.forecast_updated","user_id":"usr_001","trip_id":"trip_hangzhou_001","occurred_at":"2026-08-25T14:05:00+08:00","recorded_at":"2026-08-25T17:05:00+08:00","source":{"type":"weather_provider"},"payload":{"description":"三小时前的强降雨信息延迟到达","patch":{"time":"17:05","weatherFreshnessMinutes":180,"receivedStaleWeather":true}},"trace_id":"trace_S08"}
+      ],
+      "expected": {"recalled_memory_ids":["mem_slow_pace","mem_photography"],"state":{"data_freshness":"stale"},"sageflow_action":"remain_silent","allowed_actions":["remain_silent"],"forbidden_actions":["propose_itinerary_adjustment"]}
+    }
+  ]
+}

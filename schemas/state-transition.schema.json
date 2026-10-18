@@ -1,0 +1,17 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://sageflow.local/schemas/state-transition.schema.json",
+  "title": "StateTransition",
+  "type": "object",
+  "required": ["transition_id", "user_id", "trip_id", "from_state_id", "to_state_id", "changed_dimensions", "evidence_ids", "occurred_at"],
+  "properties": {
+    "transition_id": {"type": "string"},
+    "user_id": {"type": "string"},
+    "trip_id": {"type": "string"},
+    "from_state_id": {"type": ["string", "null"]},
+    "to_state_id": {"type": "string"},
+    "changed_dimensions": {"type": "array"},
+    "evidence_ids": {"type": "array", "items": {"type": "string"}},
+    "occurred_at": {"type": "string", "format": "date-time"}
+  }
+}

@@ -1,0 +1,27 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://sageflow.local/schemas/memory-item.schema.json",
+  "title": "MemoryItem",
+  "type": "object",
+  "required": ["memory_id", "memory_tier", "memory_domain", "memory_kind", "user_id", "statement", "scope", "confidence", "salience", "evidence_event_ids", "valid_from", "last_confirmed_at", "status", "sensitivity", "version", "lineage_id"],
+  "properties": {
+    "memory_id": {"type": "string"},
+    "memory_tier": {"enum": ["short_term", "long_term"]},
+    "memory_domain": {"enum": ["user", "relational", "shared"]},
+    "memory_kind": {"enum": ["episodic", "semantic", "procedural"]},
+    "memory_type": {"enum": ["short_term", "semantic_preference", "episodic", "relationship", "procedural"], "deprecated": true},
+    "user_id": {"type": "string"},
+    "statement": {"type": "object", "required": ["subject", "predicate", "value"]},
+    "scope": {"type": "object", "required": ["domain"]},
+    "confidence": {"type": "number", "minimum": 0, "maximum": 1},
+    "salience": {"type": "number", "minimum": 0, "maximum": 1},
+    "evidence_event_ids": {"type": "array", "items": {"type": "string"}},
+    "valid_from": {"type": "string", "format": "date-time"},
+    "last_confirmed_at": {"type": "string", "format": "date-time"},
+    "status": {"enum": ["active", "superseded", "expired"]},
+    "sensitivity": {"enum": ["normal", "sensitive"]},
+    "version": {"type": "integer", "minimum": 1},
+    "lineage_id": {"type": "string"}
+  },
+  "additionalProperties": true
+}

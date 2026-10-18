@@ -1,0 +1,16 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://sageflow.local/schemas/recall-trace.schema.json",
+  "title": "RecallTrace",
+  "type": "object",
+  "required": ["trace_id", "user_id", "architecture", "selected_memory_ids", "channel_counts", "omitted", "created_at"],
+  "properties": {
+    "trace_id": {"type": "string"},
+    "user_id": {"type": "string"},
+    "architecture": {"enum": ["flat", "typed", "hybrid"]},
+    "selected_memory_ids": {"type": "array", "items": {"type": "string"}},
+    "channel_counts": {"type": "object"},
+    "omitted": {"type": "array"},
+    "created_at": {"type": "string", "format": "date-time"}
+  }
+}

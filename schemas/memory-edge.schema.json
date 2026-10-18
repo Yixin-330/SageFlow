@@ -1,0 +1,18 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://sageflow.local/schemas/memory-edge.schema.json",
+  "title": "MemoryEdge",
+  "type": "object",
+  "required": ["edge_id", "user_id", "source_id", "source_type", "relation", "target_id", "target_type", "created_at", "evidence_event_ids"],
+  "properties": {
+    "edge_id": {"type": "string"},
+    "user_id": {"type": "string"},
+    "source_id": {"type": "string"},
+    "source_type": {"enum": ["memory", "observation_event", "decision", "feedback", "scope"]},
+    "relation": {"enum": ["SUPPORTED_BY", "DERIVED_FROM", "SUPERSEDES", "CONTRADICTS", "EXCEPTION_TO", "APPLIES_WHEN", "LED_TO_FEEDBACK", "USED_IN_DECISION"]},
+    "target_id": {"type": "string"},
+    "target_type": {"enum": ["memory", "observation_event", "decision", "feedback", "scope"]},
+    "created_at": {"type": "string", "format": "date-time"},
+    "evidence_event_ids": {"type": "array", "items": {"type": "string"}}
+  }
+}

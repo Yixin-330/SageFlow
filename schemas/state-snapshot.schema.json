@@ -1,0 +1,23 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://sageflow.local/schemas/state-snapshot.schema.json",
+  "title": "StateSnapshot",
+  "type": "object",
+  "required": ["state_id", "user_id", "trip_id", "observed_at", "expires_at", "dimensions", "model_version"],
+  "properties": {
+    "state_id": {"type": "string"},
+    "user_id": {"type": "string"},
+    "trip_id": {"type": "string"},
+    "observed_at": {"type": "string", "format": "date-time"},
+    "expires_at": {"type": "string", "format": "date-time"},
+    "dimensions": {
+      "type": "object",
+      "additionalProperties": {
+        "type": "object",
+        "required": ["value", "confidence", "evidence_ids"]
+      }
+    },
+    "model_version": {"type": "string"}
+  },
+  "additionalProperties": true
+}

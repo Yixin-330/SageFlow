@@ -1,0 +1,2031 @@
+=== PAGE 1 ===
+PERMA: Benchmarking Per sonalized M emory
+Agents via Event-Driven Preference and Realistic
+Task Environments
+Shuochen Liu 1,Junyi Zhu 2,Long Shu 1,Junda Lin 1,Y uhao Chen 1,Haotian Zhang 1,
+Chao Zhang 1,3,Derong Xu 1,3,Jia Li 4,Bo Tang 1,5†,Zhiyu Li 5,F eiyu Xiong 5,Enhong
+Chen1,Tong Xu 1†
+1University of Science and T echnology of China, 2ESA T-PSI, KU Leuven, 3City University of
+Hong Kong, 4Northeastern University, 5MemT ensor (Shanghai) T echnology Co., Ltd.
+Abstract
+Empowering large language models with long-term memory is crucial for building agents that adapt
+to users’ evolving needs. Existing evaluations of this capability typically interleave preference-
+related dialogues with irrelevant conversations, reducing the task to needle-in-a-haystack retrieval
+while ignoring relationships between events driving user preference evolution. Such settings
+overlook a fundamental characteristic of real-world personalization: preferences emerge gradually
+and accumulate across interactions within noisy contexts. To bridge this gap, we introduce
+PERMA, a benchmark designed to evaluate persona consistency over time beyond static preference
+recall. Additionally, we incorporate(1) text variabilityand(2) linguistic alignmentto simulate
+erratic user inputs and individual idiolects in real-world data. PERMA consists of temporally
+ordered interaction events spanning multiple sessions and domains, with preference-related queries
+inserted over time. We design both multiple-choice and interactive tasks to probe the model’s
+understanding of persona along the interaction timeline. Experiments demonstrate that by linking
+related interactions, advanced memory systems extract precise preferences and reduce token
+consumption, outperforming traditional semantic retrieval of raw dialogues. Nevertheless, they
+still struggle to maintain a coherent persona across temporal depth and cross-domain interference,
+highlighting the need for more robust personalized memory management in agents.
+Correspondence:tangboneu@foxmail.com, tongxu@ustc.edu.cn
+Author Legend:†Corresponding author
+Code:https://github.com/PolarisLiu1/PERMA
+1 Introduction
+The rapid advancement of large language models (LLMs) [14, 36, 40] has catalyzed a shift from static knowledge
+access paradigms to interactive agents capable of sustained engagement [78]. In this new paradigm, long-term
+memory is no longer merely a tool for knowledge retrieval, but a prerequisite for maintaining coherent user
+representations across interactions. A reliable memory-equipped agent not only stores past information, but
+continuously constructs and updates a consistent persona state that reflects users’ constraints and behavioral
+tendencies over time [18].
+1
+arXiv:2603.23231v2  [cs.AI]  17 May 2026
+
+=== PAGE 2 ===
+Despite these requirements, inherent limitations in context window size and token costs present significant
+bottlenecks [45, 48, 71]. To mitigate these challenges, recent progress in retrieval-augmented generation
+(RAG) [12, 28, 29, 70] has bolstered LLMs’ capacity to extract relevant factual knowledge [5, 27, 60, 79]. To
+further refine retrieval quality, several approaches have introduced structured memory indices [59, 61, 62],
+such as tree- [42, 44] and graph-based [6, 30, 53] representations. Complementing these retrieval techniques,
+reinforcement learning (RL) has been incorporated to optimize memory utilization in long-context settings [33,
+65, 68]. Beyond generic storage mechanisms, personalization-oriented agents leverage modular memory
+architectures and context-aware memory structures. These agents emphasize capturing user profiles and
+preferences to inform downstream conditioning for long-horizon planning and lightweight deployment [10, 25].
+While these architectural innovations endow agents with the potential for long-range memory, the method for
+quantifying their personalized performance within complex real-world scenarios remains an open challenge.
+Along this line, empirical studies [19, 75] have underscored the inherent difficulties in verifying user-centric
+personalization, a task typically benchmarked by preference recall fidelity and robustness to token-level noise
+across extended interactions [32]. While current LLMs excel at factual retention [52], effective personalization
+necessitates a paradigm shift [2]: treating user preferences not as static attributes, but as evolving behavioral
+patterns that must be contextually inferred and extracted during ongoing task interactions [20, 64]. Thus,
+the primary bottleneck is not simple memorization, but theinterpretation,integration, andretrieval
+of preference signals that are often latent, incrementally expressed, or obscured by conversational noise.
+Unfortunately, as illustrated in Figure 1 (a), existing evaluation frameworks remain insufficient for assessing
+the longitudinal consistency of persona understanding, due to three limitations: (1)Preference-Centric
+F raming: Existing protocols [75] construct the origins of preferences using static statements from a user
+perspective, rather than capturing the adaptive nature of preferences through iterative feedback. Such a
+formulation turns the conversation between user and assistant into a preference briefing, thereby overlooking
+how preferences manifest through event-driven dialogues. Consequently, the resulting evaluation ignores the
+interactive nuances of real-world deployment, failing to represent noise-rich scenarios such as ambiguous
+requests [23]. (2)Static User Modeling: As preferences are predefined prior to dialogue, models are evaluated
+based on isolated user preferences [11, 75], treating them as static snapshots and neglecting cross-session
+dependencies that are essential for assessing agents’ ability to reason over continuous interactions. It remains
+difficult to verify whether a model can achieve the cross-domain synthesis and retrieval required for complex
+queries [19], often leading retrieval-based approaches to appear effective under recall-oriented settings while
+their performance is overestimated [58]. (3)Outcome Assessment: Ideally, a memory-augmented agent
+should progressively integrate interaction histories and user preferences to enhance the efficiency of subsequent
+sessions, thereby reducing token overhead and minimizing the need for redundant repetitive user prompting.
+Current evaluation paradigms primarily focus on the capabilities of standalone LLMs and assess performance
+mainly based on the final LLM outputs, conflating memory retrieval with the generation process in memory
+systems rather than evaluating them separately. As a result, the quality and efficiency of the underlying
+memory systems, as well as memory utility in interactive scenarios, remain unexamined. These limitations
+highlight the need for alignment between benchmark construction and real-world interaction scenarios.
+To this end, we introducePERMA, a benchmark designed to evaluate the maintenance of persona states,
+defined as a combination of dynamic user preferences and episodic memory. PERMA models personalization
+as a temporally evolving state derived from interaction events, where each session addresses specific task
+requirements within a targeted topic. Through this process, fine-grained preference details are not explicitly
+given as standalone statements, but are inferred from how users articulate requests, provide feedback, and
+refine constraints across turns. These extracted preference signals, together with interaction history, are
+integrated into the evolving persona state, progressively enriching the user profile. As illustrated in Figure 1 (b),
+we construct the interaction histories of representative users across10countries and diverse age demographics,
+spanning over20distinct topic domains and extending the scope to include2,166preference details. Table 1
+summarizes the resulting corpus, which contains upwards of800events across domains, with contexts totaling
+1.8Mtokens. To ensure both structural coherence and linguistic realism, we adopt a two-stage generation
+process as illustrated in Figure 2. A timeline generation agent first transforms these events into detailed
+descriptions and objectives necessary for dialogue reconstruction. Events are categorized into “emergence” and
+“supplement” types to distinguish between the emergence of new preferences and the refinement of existing ones
+2
+
+=== PAGE 3 ===
+MoviesMoviesAlarm Travel Travel Flight Travel Travel
+Preference-Centric Framing
+(b) PERMA
+Early 
+Recent 
+Event Summary: 1. The user, residing in Finland, begins exploring travel opportunities 
+with a focus on cultural and historical destinations.
+2. The user begins to incorporate couple-centric activities into her travel plans, indicating a 
+shift towards more romantic experiences.
+Isolated Preference 
+Evaluation
+I was super excited about it, but then I 
+felt like there was so much information 
+to sift through. The excitement I felt in-
+itially was palpable; I had images in my 
+mind of sun-soaked beaches ...
+LLM
+Interweave conversations
+Classification Task
+A . B. C. D.
+QuestionInteraction History
+ Options
+Age: 25-34 year old 
+Gender: Female
+Country: Finland
+0.9
+0.95
+0.85
+0.8
+0.75
+0.7
+0.65
+0.6
+0.55
+0.5
+0.45
+That’s understandable. It can be a bit 
+of a daunting task when faced with 
+such a wealth of information. Many of 
+us have experienced that feeling ...
+Yes, I found some resources. I stumbled 
+across a couple of travel websites ...  
+(A briefing of preferences to the assistant)
+User
+User
+Preference-Change
+Search Preference: 
+Explicit: The user wants accommodations in 
+Barcelona that prioritize sustainability and 
+is interested in supporting local projects
+Implicit: a cozy and intimate atmosphere
+Persona Profile (Static)
+Search Preference: 
+Explicit: The user is planning an 
+extended trip to Paris and wants to 
+explore both iconic landmarks like the 
+Eiffel Tower and the Louvre
+Implicit: both sustainability and 
+cultural enrichment
+Search Preference: 
+Explicit: User wants a daily travel sched-
+ule that is chill but packed with cool stuff
+Implicit: locations with artistic and 
+historic significance
+Event-Driven 
+Capture adaptive preferences 
+through feedback
+5
+3
+2
+4
+1
+# of Events
+(a) Existing evaluation protocols
+Interactive Evaluation
+EMERGENCE Event
+SUPPLEMENT Event
+Interaction Turns
+MCQ Accuracy
+Persona State (Dynamic) 
+Search Preference: 
+Explicit: User is particularly interested in 
+dining options that offer a unique 
+ambiance and some historical charm
+Implicit: Interest in photography tours 
+that offer urban exploration experiences
+1 2 3 4 5 6 7
+Figure 1Comparison of context construction and evaluation. (Left) Existing benchmarks: Evaluate isolated
+preferences via sparse, “Needle-in-a-Haystack” retrieval. (Right)PERMA: Implements an event-driven paradigm
+where preferences are integrated over time and across sessions to assess the capabilities of memory systems.
+across different topics. Subsequently, a dialogue generation agent is prompted to flesh out the full conversation
+based on the event descriptions and objectives, yielding aCleanversion with standard, non-rigid interactions.
+The agent also specifies the concrete preference being realized. To ensure coherence and consistency, we employ
+an LLM-based verification and human validation pipeline, triggering an iterative re-generation loop whenever
+preferences are not presented in the dialogue. Drawing on challenges from prior research, we incorporate
+two key factors to better approximate real-world interactions. First, we introducetext variabilitythrough
+the injection of five types of human prompt biases [50] into each event as in-session noise, thereby capturing
+realistic within-session disruptions such as intent shifts, ambiguous expressions, and preference corrections.
+Second, we modellinguistic alignmentwith authentic data by aligning user queries with individual idiolects
+from WildChat [76], fostering diverse phrasing patterns grounded in natural interactions. Finally, we construct
+three distinct context tiers for comparative analysis:Clean,In-session Noise, andStyle-aligned Long-context.
+Table 2 provides illustrative examples of injected in-session noise types and style-aligned queries.
+To conclude, PERMA enables us to investigate the impact of persona construction across multiple domains,
+natural prompting noise, and temporal evolution. To evaluate LLM agent behavior under these settings,
+we design multiple-choice questions (MCQs) from three perspectives, namelytask completion,preference
+consistency, andinformation confidence, to examine whether agents can retrieve and apply historical in-
+formation in one shot. Meanwhile, to simulate real-world multi-turn interaction, we further implement an
+LLM-based user simulator that provides supplemental information when preference is unmet. This creates
+an iterative feedback loop between the simulator and the LLM agent, which continues until the generated
+response satisfies the underlying preference. We benchmark a diverse set of standalone LLMs and agents
+equipped with memory systems, analyzing their effectiveness in contextualizing user preferences and retrieving
+relevant memory segments. Furthermore, we conduct probing evaluations at various temporal intervals along
+the dialogue timeline to examine how performance evolves as persona states accumulate and potentially drift.
+This comprehensive analysis offers critical insights into the underlying mechanics of memory systems and their
+capacity to sustain coherent persona states under realistic, long-term interaction conditions. Our contributions
+are summarized below:
+3
+
+=== PAGE 4 ===
+T able 1Comprehensive statistics of the dataset across multiple dimensions. The table summarizes user demographics
+for profiles, followed by statistics for the base (comparingCleanandNoise) and the style-aligned long-context dataset.
+Metric P1 P2 P3 P4 P5 P6 P7 P8 P9 P10 T otal
+User Demographics
+Age 35-44 25-34 65+ 55-64 35-44 18-24 25-34 35-44 25-34 25-34 –
+Gender M M F M M M M M F M –
+Education Grad. Univ. – Univ. – Grad. Univ. – Grad. Univ. –
+Country CA MX FI US AU UK CH IL RU BE –
+Interaction Statistics (Base Dataset: Clean / Noisy)
+# Interests 17 16 15 15 17 13 13 17 16 12 151
+# Queries 63 62 60 59 63 51 50 63 60 49 580
+# Events 81 81 85 79 82 79 75 81 81 84 808
+# Dialogs 356/364 340/358 373/379 347/352 348/370 349/357 321/329 350/364 359/362 365/375 3.5k/3.6k
+# Tokens (k) 34/34 32/33 33/36 31/31 33/33 32/32 31/31 32/36 34/39 33/34 324/331
+Style-aligned Long-Context Dataset
+# Events 156 141 156 139 137 107 176 94 155 127 1,388
+# Dialogs 1009 848 1084 876 888 802 1015 798 969 869 9,158
+# Tokens (k) 139.0 61.4 174.0 88.9 197.2 69.0 151.1 62.7 143.7 78.4 1,165.4
+1. We introduce a benchmark PERMA for evaluating LLM agents that shifts the paradigm from static
+preference recall to preference synthesis based on event-driven personalized dialogue scenarios. PERMA
+incorporates realistic in-session noise and linguistic style to assess how well agents infer and extract
+preferences through iterative interactions.
+2. We formulate a dynamic user modeling evaluation protocol that tests an agent’s ability to maintain persona.
+By focusing on cross-domain synthesis, PERMA evaluates the agent’s capacity to reason over multiple
+sessions. Importantly, the evaluation queries reflect natural user requests, enabling assessment of memory
+utilization in realistic application scenarios rather than recall-oriented settings.
+3. We design a comprehensive assessment suite across multiple dimensions. By employing a user simulator to
+facilitate multi-turn interactions and incorporating temporal probing, we assess how agents synthesize and
+apply memory over evolving preferences, revealing their strengths and limitations under temporal drift and
+semantic interference.
+2 Related Work
+2.1 Evolution of Personalization Memory Benchmarks
+2.1.1 Evaluating Long-Context Memory Capabilities of LLMs
+The evaluation of long-context capabilities in LLMs [54, 66, 67] has historically relied on “Needle-in-a-Haystack”
+style tests that measure a model’s ability to retrieve facts embedded within lengthy contexts [26, 37]. While
+early benchmarks were limited to 10k-token interactions, recent efforts [32, 46, 48], such as LongMemEval [57]
+extend evaluation to ultra-long multi-session dialogues ranging from 115k to over 1.5M tokens, incorporating
+tasks that probe cross-session memory and free-form question answering. Nevertheless, these benchmarks
+primarily evaluate whether models can access and reason over long interaction histories, rather than how user
+preferences are incrementally inferred and integrated during ongoing interactions for personalization. Table 3
+provides a comparison between existing memory and personalization evaluations across multiple dimensions.
+4
+
+=== PAGE 5 ===
+T able 2Taxonomy of in-session noise types (1-5) and style-aligned queries (6). The structure highlights the agent’s
+ability to resolve ambiguity (noise ), maintain persona coherence (memory ).
+Type Interaction Examples (U: User, A: Assistant)
+[1] Omitted Info. U:Can you give me guidance onthat game? → A:Could you specify which game?→
+U: The Witcher 3 .→A:Certainly. I suggest optimizing the PC graphics and ...
+[2] Context Switch U: By the way, do you remember my hockey tickets?→ A:Yes, Maple Leafs tickets for
+Nov 5th... → U:Thanks. Now back to the wine tasting...→ A:Understood. Regarding
+the culinary events ...
+[3] Inconsistent Pref. U:For this week, I want to see thebiggest conference. → A:The Global Tech Summit
+(10k+ attendees) is happening now.→ U:Those are too crowded. Maybe something
+low-key would be better.
+[4] Multi-lingual U:“Je voudrais explorer les dégustations de vins locaux.”→ A:“Certainement. Préférez-
+vous des accords avec du fromage ou du chocolat ?”→ U:“Avec du fromage, s’il vous
+plaît.”→ A:“Parfait. J’ai trouvé plusieursévénements gastronomiques dans votre
+région pour ce week-end.”
+[5] Colloquial Exp. U:I’m trying tovibe at dope tech events ASAP.→ A:Understood. Are you looking
+for large summits or local meetups?→ U:Keep it chill and small. → A:Here are a
+few boutique tech gatherings ...
+[6] Style-aligned U:I need help organizing my calendar for a recurring event. I’d like to set up weekly family
+lunches on Sundays with my family. Can you assist me with that?→ (styled-aligned)
+U:Trying to set up weekly family lunches onSundays with the whole gang .
+2.1.2 T owards Personalization in Memory
+At the core of personalized interaction and lifelong digital companions [58] lies the concept of user preferences [9,
+41, 72], defined as the longitudinal collection of a user’s stable interests, stylistic inclinations, and task-specific
+constraints [15]. For a personalized agent [17, 22, 64], these preferences constitute a latent state that must
+be captured from historical interactions to guide subsequent response generation. This ensures that agent
+behavior aligns with individual expectations without necessitating repetitive, explicit instructions. The
+fundamental necessity of preference modeling is to alleviate the “interaction burden” – empowering agents to
+proactively anticipate user needs from historical context, thereby enhancing efficiency and user satisfaction in
+real-world applications.
+Broadly, personalization benchmarks have evolved from (i) static preference conditioning to (ii) multi-session
+preference retention, yet few explicitly evaluate whether models can maintain a coherent persona state
+under evolving, information-dense interactions. Early frameworks, such as PrefEval [75] and PerLTQA [9],
+characterized personalization as conditional response generation, focusing on an LLM’s capacity for long-
+context understanding, user modeling and adherence to a constrained set of stated preferences. These
+studies revealed that contemporary LLMs struggle to infer implicit preferences accurately and apply them
+consistently across conversational turns, particularly when intervening dialogues introduce unrelated topics
+as “contextual token noise” [46]. Despite these advancements, it remains designed for “Needle-in-a-Haystack”
+tasks, in which isolated preferences are retrieved from vast volumes of unrelated context. To enhance the
+recognition of personalized intent, UserBench [38] and PersonaLens [77] introduced interactive, gym-like
+environments. These benchmarks advanced the field toward simulating real-world agent dynamics; however,
+they treat user profiles as fixed inputs rather than evolving constructs. A pivotal shift toward memory
+retention occurred with PersonaMem [19], which incorporated multi-session interaction histories. PersonaMem
+centers on preference-driven dialogue construction; consequently, its dialogues resemble subjective opinion
+sharing rather than objective problem solving. Subsequently, PersonaMem-v2 [20] further advances this
+paradigm by focusing on implicitly expressed preferences and requiring LLMs to infer user traits from subtle
+conversational nuances. It assumes that implicit behavioral cues can be consistently abstracted into stable
+5
+
+=== PAGE 6 ===
+T able 3Comparison of PERMA with existing benchmarks for persona modeling and memory evaluation.Event-driven
+Preferencerefers to preference formation through interaction events;Context Noisedenotes the presence of irrelevant
+or distracting context;Temporal Probingevaluates performance across multiple time points.✓, G #, and ✗denote full
+support, partial support, and absence of the corresponding feature, respectively.
+Benchmark Dynamic
+Preference
+Event-driven
+Preference
+Context
+Noise
+Implicit
+Preference
+Cross-domain
+Reasoning
+Memory
+Representation
+MCQ
+Evaluation
+Interactive
+Evaluation
+T emporal
+Probing
+Episodic Fact Memory
+LoCoMo [32]✗ ✗ ✗ ✗ ✓Episodic Memory✗ ✗ ✓
+LongMemEval [57]✗ ✗ ✗ ✗ ✗Episodic Memory✗ ✗ ✓
+MemoryBench [1]✓ ✗ ✗ ✗ ✗Declarative Memory✗ ✗ ✓
+Personalized Agent
+PersonaLens [77]✗ ✗ ✗ ✓ ✓-✗ ✓ ✗
+UserBench [38]✓ ✓ ✗ ✓ ✗-✗ ✓ ✗
+Personalized Memory
+PerLTQA [9]✗ ✗ ✗ ✗ ✓Episodic Memory✗ ✗ ✗
+PrefEval [75]✗ ✗G #✓ ✗Single-session✓ ✗ ✓
+PersonaMem [19]✓ ✗G # G #✗Dynamic Memory✓ ✗ ✓
+PersonaMem-v2 [20]✓ ✓ ✗ ✓ ✗Implicit Preference✓ ✗ ✗
+KnowMe-Bench [58]✗ ✗ ✗ ✓ ✗Autobiographical✗ ✗ ✗
+PERMA (Ours)✓ ✓ ✓ ✓ ✓Persona State✓ ✓ ✓
+preference variables. However, in realistic interactions, many implicit signals are situational and do not
+necessarily correspond to enduring persona states. These frameworks still evaluate preference recognition and
+recall within constructed interaction traces, without explicitly probing the stability, cross-domain synthesis,
+and temporal consistency of the underlying persona state. Recent efforts, such as the KnowMe-Bench [58], use
+long-form narratives as a data substrate to evaluate evidence-grounded inference about motivation, identity
+development, and psychological states. Yet KnowMe-Bench is better characterized as a reasoning benchmark
+rather than as an assessment of personalized conversational user-assistant interaction or dialogue management.
+To address these limitations, PERMA introduces a dynamic evaluation paradigm centered on active dialogue
+management. We shift the evaluative focus from single-point preference recall to composite synthesis, requiring
+memory systems to integrate interdependent traits across information-dense sessions to resolve complex queries.
+By employing an event-driven methodology, our framework captures the evolutionary nature of user profiles;
+specifically, the interplay between newly emerged and updated preferences, while moving beyond “black-box”
+long-context reasoning evaluation through a decoupled assessment of retrieved memory quality and generative
+reasoning. As a result, PERMA reframes personalization evaluation from preference identification to persona
+state maintenance across temporally ordered events with structured noise and cross-domain dependencies.
+Such requirements extend beyond traditional dialogue retrieval, motivating the development of dedicated
+memory systems and memory-enabled agents for persistent user modeling.
+2.2 F rom Static Retrieval to Persistent Memory
+Personalization in LLMs has undergone a fundamental architectural shift driven by the growing mismatch
+between transient context conditioning and the requirements of long-term user–assistant relationships [24, 64].
+Early approaches implicitly equated personalization with prompt augmentation, assuming that user history
+could be sufficiently represented within a fixed or expanded context window. However, this assumption fails
+at scale: attention-based architectures exhibit context dilution and the “lost-in-the-middle” phenomenon,
+rendering long-term user modeling inefficient [26].
+Retrieval-Augmented Generation (RAG) [12, 29] reframed this problem by externalizing memory into non-
+parametric storage. By enabling semantic access to repositories of user-related information, RAG alleviated
+context window constraints and improved factual grounding. Yet this architectural move introduced a new
+limitation: memory was reduced to static, document-like artifacts retrieved reactively based on semantic
+similarity [23, 39]. RAG systems remain inherently stateless, primarily serving as indexing mechanisms for
+6
+
+=== PAGE 7 ===
+user-assistant dialogue rather than modeling the temporal evolution and coherence of user personas [34].
+Unlike passive retrieval in vanilla RAG, agentic frameworks utilize LLMs as reasoning engines to orchestrate
+tool use [55, 69] and multi-step planning [73]. However, for an agent to exhibit consistent personality and
+long-term adaptation, it requires a persistent memory system, which functions as the agent’s long-term storage.
+Recent work [8, 53, 63, 74] has begun to formalize this transition by treating memory as a structured, lifecycle-
+aware subsystem. Rather than storing immutable embeddings, memory architectures introduce mechanisms for
+consolidation, reinforcement, decay, and reorganization [18,43]. This marks a shift from storage-centric memory
+to process-oriented memory, in which the relevance of stored information is dynamically updated over time.
+Memory systems that support fine-grained updates recognize that personalization must operate at multiple
+levels, including episodic experience, user preferences, and behavioral patterns. MemOS [25] was among
+the first to formalize memory as a core system component, introducing a lifecycle management mechanism
+(MemCube) that enables dynamic memory scheduling, aging out obsolete facts while reinforcing relevant ones
+over long horizons. Similarly, Mem0 [6] is a scalable memory-centric architecture that dynamically extracts,
+consolidates, and retrieves salient conversational information from ongoing interactions, supporting persistent,
+structured memory beyond raw document retrieval. Memobase focuses on extracting and maintaining
+structured user profiles and tagged memory records from chat interactions, serving as a scalable backend for
+personalized applications. Supermemory provides a unified memory API that builds structured relationships
+between facts to support persistent recall and relational context beyond simple vector proximity. Compared
+to existing benchmarks (Table 3), the differentiation of PERMA lies in the multi-dimensional decoupling of its
+evaluation. While LLMs and memory systems have improved in memory capacity, they still lack a fine-grained
+characterization of event-driven persona state evolution, which is essential for reflecting the mastery of user
+preferences. Furthermore, by integrating context noise and temporal probing, PERMA enables us to verify
+the coherence persona state within complex event streams, independent of mere interaction quality.
+3 Preliminaries
+To formally characterize the construction of an event-driven dialogue dataset, we establish a mathematical
+framework defining the constituent elements of the user profile and the temporal interaction sequence.
+Definition 1.Data Specification.Let U denote the set of users. For each useru∈ U , the user profile is
+defined as a tripletPu = {Du,I u,E u} where Du is the demographic profile (e.g., age and gender).Iu denotes
+the set of user interests,Eu denotes the temporally ordered interaction events between the user and assistant.
+Definition 2.Interaction Event.An interaction event in Eu at time step t is defined as a tupleet =
+(τt,dom t,C t,Φ t), whereτ t ∈ {Emergence,Supplement,Task}denotes event type:
+•Emergence: The user’s first discovery of a domain, establishing initial preferences.
+•Supplement: A follow-up interaction where preferences are refined, modified, or deepened.
+•Task: A task-oriented user query probing the model’s integration of prior preferences.
+domt ⊆ I u is the set of relevant domains involved in this event.Ct = [(q(1)
+t , a(1)
+t ), . . . ,(q(N)
+t , a(N)
+t )]represents
+the multi-turn dialogue content, consisting ofN turns of user queriesq(k)
+t and assistant responsesa(k)
+t .Φ t is
+the set of explicit or implicit preferences revealed during this event.
+When τt = Task,Φ t is empty andCt = [q(1)
+t ]. This event serves as a checkpoint to evaluate the model’s
+response to preference-relevant queries (i.e.q(1)
+t ). A task can beSingle-Domainif|domt| = 1orMulti-Domain
+if |domt|> 1, with the latter requiring the joint synthesis of preferences across domains. Each task utilizes the
+current persona state as a user preference prior. Tasks are classified into three types based on their position
+in the interaction history:
+• Type 1(Zero-Memory): Evaluated at the onset of interaction before relevant preferences are established.
+•Type 2(In-Time): Positioned immediately after all relevant sessions in domt have occurred.
+•Type 3(Post-Intervention): Positioned after a series of sessions containing unrelated topics.
+7
+
+=== PAGE 8 ===
+Definition 3.Persona State.For a user u, we define the persona state at timet as a text representationS u
+t
+that synthesizes integrated user preferences and episodic memory derived from the concatenated dialogues
+Gu,≤t ={C 1,C 2, . . . ,Ct}corresponding to historical eventsE u,≤t = (e1, e2, . . . , et):
+S u
+t =f({C 1,C 2, . . . ,Ct}),(1)
+where for memory systems,fdenotes an operator that aggregates the persona state by incorporating newly
+emerged or updated preferences from historical dialogues. In contrast, for standalone LLMs and vanilla RAG
+systems, f reduces to an identity mapping over the raw interaction history. Unlike the static user profilePu,
+the persona stateS u
+t evolves dynamically, reflecting incremental preference refinements and potential drift,
+thus enrichingP u with fine-grained preference and behavioral details.
+Definition 4.Persona Consistency Objective.Given a sequence of historical events Eu,≤t = (e1, . . . , et),
+where et is a task event, our benchmark requires the agent to generate a responseat to the queryqt that
+maximizes alignment with the user’s evolved persona state extracted from the interaction dialoguesGu,≤t.
+Formally, the modelPseeks to optimize the objective:
+a= arg max
+a′
+P
+ 
+a′ |q t,S u
+t
+
+s.t.S u
+t =f(G u,≤t),(2)
+where a should satisfy the joint constraints of the demographic attributes inDu and the preference updates
+encapsulated inΦ1:t. To this end, the agent must navigate multi-session and cross-domain histories to integrate
+relevant memory segments.
+Definition 5.Memory System.Compared to providing raw historical interactions Gu,≤t and user queryqt
+to a standalone LLM to generate a responsea, memory systemsM implement a dual-process mechanism
+composed of an ingestion operation (Add) and a retrieval operation (Search). Given the completed interaction
+sessionsG u,≤t of useruobserved at timestampt, the system updates its internal persona state byAdd:
+S u
+t ←Add(M,G u,≤t),(3)
+where the ingestion process may involve indexing conversational history, extracting salient facts, or updating
+structured user persona state, such as a knowledge graph. Subsequently, for a user queryqt, the system
+retrieves a set of contextually relevant memory segmentsst ⊆ S u
+t bySearch:
+st ←Search(S u
+t ,M, q t, k),(4)
+where k denotes the number of retrieved items. The effectiveness of a memory systemM is reflected by the
+utility ofs t in answering user queryqt.
+4 Methodology
+In this section, we introducePERMA. Rather than treating personalization as static preference recall, our
+framework models personalization as evolving preferences through an event-driven reconstruction of dialogue
+histories (Section 4.1). To better reflect real-world user-assistant interactions, Section 4.2 introduces two
+interaction variants by (1) injecting text variability based on common user prompt biases [50], (2) aligning
+query linguistic styles with real-world data. We evaluate downstream queries that do not explicitly trigger
+preference retrieval, thereby testing whether agents can proactively leverage stored information to integrate
+and enforce composite, cross-domain preferences (Section 4.3).
+4.1 Event-Driven Dialogue Reconstruction
+We construct dialogue histories based on interaction summaries from PersonaLens [77], which are grounded in
+authentic user profiles derived from the PRISM dataset [21]. These profiles span 20 distinct domains, ranging
+from Movies to Flights. We extend these concise summaries into long-horizon, consistent dialogue histories
+that capture the gradual emergence and iterative refinement of user preferences.
+As illustrated in Figure 2 (a), we decompose each domain-level interaction summary into a sequence of
+chronological events, where each event corresponds to a coherent interaction session and remains consistent
+8
+
+=== PAGE 9 ===
+Post-Intervention: 
+After a series of sessions
+Long-term memory
+1. The user initiated her interaction with the Alarm agent. She was interested in setting up a 
+recurring alarm for her weekday morning routine. Her priority was to configure an alarm ...                                                    
+2. She begins to incorporate couple-centric activities into her Travel plans, indicating ...
+Interaction Summary
+1. Timeline generation
+Alarm
+Event Information
+Type: Emergence                                                                         [2023-01-15]
+Description: She initiates her interactions by planning an trip to Paris ...
+Event Goal: Craft a detailed itinerary for a 3-week trip to Paris, including ...
+Dependencies: None
+  Relevant domain: Travel
+Style-aligned Long-context
+In-session Noise
+Clean
+ I'm thinking about an extended trip to 
+Paris. ... Could you help me craft a 
+itinerary for about three weeks?
+User
+ ... Do you have any specific landmarks 
+in mind that you're interested in?
+Well, I'm definitely interested in the 
+classic spots like the Eiffel Tower 
+and the Louvre, but I also want to 
+discover some lesser-known areas that 
+are great for urban exploration ...
+User
+Capture preferences through feedback:
+Details: Preferred Destination: Eiffel Tower, Louvre               ... 
+(b) Evaluation Pipeline
+Travel
+Travel
+Flight
+Movie
+Movie
+Travel
+Other
+Type 2
+Type 1
+Type 3
+5. Temporal Checkpoints
+6. Contextual Position Probing
+7. Evaluation Dimensions & Metrics
+4. Task Insertion 3. Human Validation
+2. Dialogue generation
+Type 1 Type 2 Type 3
+10 % 40 % 100 %
+Timeline
+Real-data Query 
+Style (Wild-Chat)
+1. Omitted Info
+2. Context Switch
+3. Inconsistent Pref.
+4. Multi-lingual
+5. Colloquial Exp.
+QueryPreference 
+Memory 
+ Options
+1. Task Completion (T/F)
+2. Preference Consistency (T/F)
+3. Informational Conf. (T/F)
+Query
+Preference Memory
+Response (Turn 1)
+Feedback
+Refine (Turn 2)
+Text Variability
+Noise Injection
+Linguistic
+Style-Aligned
+Zero-Memory
+No interaction occur
+In Time: Necessary 
+info is available.
+Segment positions of context
+Response
+ Ground Truth
+Construct options (MCQs)
+(a) Event-Driven Dialogue Construction
+20 %
+ 90 %
+Interaction Turns
+Event (Emerg. & Supp.)
+Interaction Evaluation
+Event (Task)
+Single-
+domain
+Multi-
+domain
+Task is completed while
+satisfying all preferences
+Context Length Increases
+Figure 2The PERMA pipeline for dialogue construction and evaluation.Left: The dialogue construction pipeline
+leverages User Profiles and domain-specific Interaction Summaries to generate a structured timeline.Right: Evaluation
+ofTaskEvents is conducted through two protocols: (1) One-shot MCQ probing, which measures selection accuracy
+across three evaluation dimensions to assess zero-shot preference recall; and (2) Interactive evaluation, involving
+multi-turn dialogues where a user simulator assesses task completion and preference satisfaction, while providing
+corrective feedback for suboptimal responses. Both evaluation protocols are executed across varying temporal depths
+within the full dialogue history.
+with the user profile. For each event in the timeline, we generate (1) an event description that defines
+the conversational scope and the key behavioral cues, (2) an interaction goal that specifies the intended
+dialogue outcome, and (3) a set of dependencies that determine the generation ordering among events. This
+event specification constrains dialogue generation to realize concrete behavioral signals, rather than vague
+conversational templates. During the generation, the agent is provided with user preference categories and the
+aforementioned context. Guided by event descriptions and objectives, the dialogue generation agent elaborates
+on the necessary preference details through either explicit user descriptions or implicit feedback.
+4.1.1 Phase I: Timeline and Dialogue Generation
+Given an interaction history summaryHu provided by Personalens [77] and a user demographic profileDu,
+we employ a capable LLM (e.g., GPT-4o) as a high-level planner to construct an interaction timelineT .
+Formally, letfplan denote the LLM timeline planner. For each topic domaink∈ I u, the planner generates a
+domain-specific timeline conditioned on the corresponding historical summaryHk
+u:
+Tk =f plan(Du, k,H k
+u).(5)
+We first prompt the model to categorize timeline entries into two types: preference emergence and preference
+supplement as introduced in Definition 2, thereby modeling iterative preference refinement. Each entryˆe∈ Tk
+is further associated with a detailed conversation description and cross-domain dependencies to facilitate
+inter-domain linkage.
+Let Tk = {ˆe1, . . . ,ˆeM } denote the chronological sequence ofM timeline entries associated with useru within
+9
+
+=== PAGE 10 ===
+the same domaink. We iteratively generate a multi-turn dialogueCm for each timeline entryˆem using an
+LLM Pg, conditioned on the user profileDu, interest categoriesIu and the previously generated dialogue
+historyG k
+u,m−1 ={C k
+1 , . . . ,C k
+m−1}.
+Ck
+m,Φ k
+m ∼P g(· | D u,I u,ˆet,G k
+u,m−1)(6)
+whereΦ m represents any new preferences that emerged or updated during this session. For the initial
+preference emergence entry within a domain, where no prior interactions exist, the entry itself serves as the
+starting point. We validate generated results with human experts and an LLM-based verification pipeline.
+The final event is constructed by concatenating the timeline entryˆewith the corresponding dialogueCk
+m and
+preferences, i.e.,e m =concat(ˆem,C k
+m,Φ k
+m).
+After generating all events across domains, we construct a global timelineTfinal by interleaving the domain-
+specific timelines {Tk}K
+k=1. This aggregation respects explicitly defined cross-domain dependencies and strictly
+enforces chronological order according to the parsed timestamps, with a unified time indext across all events.
+4.1.2 Phase II: T ask Insertion
+To evaluate memory utilization at varying temporal depths, we inject evaluation tasks intoTfinal using a
+timestamp-based insertion strategy that probes the lifecycle of preference development. For a task event
+et(τt = Task)associated with relevant domainsdomt ⊂ I u, we establish three types of evaluation checkpoints
+(Definition 2). As shown in Figure 2 (b), we place Type 1 (Zero-Memory) tasks at the onset of the timeline,
+before any relevant events occur, serving as a non-personalized control to separate the parametric bias of the
+agent from persona-based answers. Type 2 (In-Time) task is placed right after the final events of relevant
+domains to evaluate the integration of the entire trajectory. Additionally, to quantify robustness against
+forgetting and contextual interference, we construct Type 3 (Post-Intervention) tasks by positioning tasks
+at the conclusion of the global timeline. This checkpoint follows a series of intervening sessions involving
+unrelated domains. By comparing the performance delta between Type 2 and Type 3, we can effectively
+measure the agent’s resilience over a long horizon.
+4.2 Alignment with Real-W orld Interactions
+In event-driven persona state modeling, the inherent noise and disfluencies of real-world interactions present
+significant hurdles. For example, user utterances can be vague, and preferences are often fragmented across
+multiple messages. While prior research [19, 75] has introduced preference updates post multiple sessions, we
+aim to incorporate a broader spectrum of text variability observed in human prompts for LLM [50], as well as
+individual idiolects.
+4.2.1 T ext V ariability Injection.
+In natural interactions, user inputs frequently contain vague expressions, inconsistent preferences, or context
+switch, as illustrated in Table 2. Such phenomena challenge personalized memory agents not only in retrieving
+relevant information but also in integrating histories and composing accurate persona-state signals.
+However, synthetic text is often standardized and lacks variability, even when using a high temperature for
+generation [56]. To bridge this gap, we introduce a controlled noise injection process during dialogue generation.
+Specifically, we perturb user turns with contextually grounded in-session noise that preserves conversational
+plausibility. Building upon the original dialogue-generation prompt and extracted preferencesΦ, we augment
+the generation process by providing a noise specificationZ that describes the intended perturbation type
+(e.g., omitted references, context switch, or inconsistent preferences). We also generate examples conditioned
+on Z, which are incorporated as one-shot in-context demonstrations [3] in noise specification to guide the
+dialogue generation agent.
+Formally, similar to Equation 6, let ˆem denote the current timeline entry in domain k, and Gnoise
+u,m−1 =
+{Cnoise
+1 , . . . ,C noise
+m−1 } the previously generated noisy dialogues. LetZm denote the noise specification sampled
+for evente m. The noisy dialogue generation process can be expressed as:
+Cnoise
+m ∼P g
+ 
+· | D u,Φ m,ˆem,G noise
+u,m−1,Z m
+
+.(7)
+10
+
+=== PAGE 11 ===
+Compared to the Clean setting, the conditioning variableZm steers the user turn construction toward vague
+or misleading patterns, all while preserving semantic alignment with the underlying persona state. By
+substituting the original turns inE with Cnoise
+m , we derive the perturbed event sequenceE noise, and keep the
+global timeline Tfinal unchanged. Under these conditions, the model is expected to maintain a stable persona
+stateS u
+t , perform context-aware retrieval and resist irrelevant turns.
+4.2.2 Linguistic Alignment.
+Real-world user inputs exhibit individual idiolects. In contrast, synthetic conversations often follow standard-
+ized templates, which simplifies retrieval and artificially inflates evaluation, especially when the generator
+and the agent share the same underlying model. To prevent models from exploiting overt lexical cues, we
+construct user prompts to mimic the authentic linguistic patterns observed in real-world interaction corpora.
+Specifically, we randomly sample real-world conversations from WildChat [76] for each user prompt in the
+Cleansetting, and instruct an LLM to align the linguistic style of the synthetic user prompt with the real
+data, while preserving the underlying user intent. In addition, we interleave WildChat data as irrelevant
+distractors within the global timeline, extending the total context up to 128k tokens. This design challenges
+models to infer persona states from diverse, individualized linguistic patterns across long-context sessions,
+thereby increasing the tasks’ complexity.
+Together, text variability and linguistic alignment ensure that our evaluation extends beyond idealized
+preference recall. Instead, PERMA probes the model’s capacity to maintain coherent persona-state tracking
+even in the presence of pervasive ambiguity and authentic linguistic variability.
+4.3 Evaluation Protocol
+To systematically evaluate persona state tracking across temporal depths and contextual complexities, PERMA
+adopts a multi-dimensional evaluation protocol. This protocol integrates temporally controlled task insertion
+to evaluate cross-session evolution, positional probing within long contexts to assess retrieval robustness, and
+comprehensive metrics that capture both factual correctness and persona consistency.
+4.3.1 Evaluation Checkpoints (Type 1/2/3).
+Checkpoints are strategically inserted into the global timeline to probe distinct stages of persona-state
+development. Type 1 (Zero-Memory) tasks are placed before any domain-relevant events occur, serving
+as a zero-memory baseline to disentangle the agent’s parametric bias from its persona-based responses.
+Type 2 (In-Time) tasks are introduced immediately following the emergence of all relevant domains to assess
+peak recall. Finally, Type 3 (Post-Intervention) tasks are placed at the end of the global timeline, after
+multiple intervening sessions. At this stage, the persona state is fully developed but heavily occluded within a
+substantially longer and noisier history.
+4.3.2 Contextual Position Probing.
+In addition to temporal stage control, we probe evaluation tasks at varying positions within contexts (e.g.,
+10%–100% event segments of the histories). By measuring performance as a function of this relative distance,
+we analyze how different personalized memory agents balance retrieval efficiency and contextual scanning.
+This positional probing provides a fine-grained view of how persona state utilization degrades or stabilizes as
+context length increases.
+4.3.3 Metrics and Assessment Dimensions.
+Evaluation is conducted along three primary dimensions: task performance, memory fidelity and efficiency.
+Task PerformanceWe evaluate system performance in both one-shot and interactive settings. In the former,
+we employ Multiple-Choice Question (MCQ) to measure selection accuracy (MCQ Acc.). The MCQ options
+are generated by ablating three core aspects: (i) Task Completion, indicating the fulfillment of defined goals;
+11
+
+=== PAGE 12 ===
+(ii) Preference Consistency, ensuring responses are grounded in long-term preferences without hallucinating
+unsupported inferences; and (iii) Informational Confidence, identifying whether the model maintains a decisive
+stance without uncertainty (see Figure 18 for details). By enumerating all binary combinations of three
+aspects, we yield eight distinct evaluation categories.
+To better approximate real-world usage, we introduce an interactive evaluation using an LLM-based user
+simulator (see Figure 16 for the prompt). The simulator is granted access to the ground-truth dialogue history
+and relevant preference annotations. It terminates the session by outputting “TERMINATE” only when the
+task is completed while satisfying all user preferences. Otherwise, it provides supplementary feedback, and
+the dialogue continues.
+We report the success rate atTurn=1 and Turn≤2. Compared to the one-shot setting, the interactive evaluation
+not only assesses open-text responses but also distinguishes suboptimal memory (resolvable with a single
+feedback round) from low-quality memory (requiring extensive clarification). Interactions are capped at a
+maximum of 10 turns. We report taskCompletion representing the percentage of tasks successfully terminated
+within this interaction limit, serving as a measure of overall system reliability.
+Memory FidelityWe calculate the BERT-f1 between the retrieved context and ground-truth dialogues,
+complemented by aMemory Score (see Figure 19) derived via “LLM-as-a-judge”. This protocol evaluates task
+coverage, accuracy, and preference consistency. Specifically, this scoring mechanism penalizes the omission of
+critical persona facets while rewarding concise, task-relevant retrievals that enhance downstream utility.
+EfficiencyWe calculate Context Token to measure the average number of memory tokens consumed per
+query. To quantify memory retrieval efficiency within long-context environments, we also record theSearch
+Duration. In the interactive setting,User Token tracks the total tokens generated by the user simulator,
+capturing the communicative overhead and degree of preference clarification required to resolve a task.
+5 Experiments
+5.1 Experiment Setup
+5.1.1 Datasets and Evaluation Metrics.
+We utilize the datasets detailed in Section 4.1 & 4.2, which incorporate event-driven preferences, text variability,
+and linguistic alignment. The evaluation setup is described in Section 4.3.
+5.1.2 Personalized Memory Approaches.
+We evaluated a range of personalized memory approaches on PERMA, categorized into two paradigms: 1)
+standalone LLMs, 2) agents with RAG and memory systems.
+Standalone LLMs.In this setting, the full dialogue history is provided to the model as input without
+any retrieval mechanism or memory compression. We evaluate both reasoning models and chat models,
+investigating their capabilities in synthesizing preferences across multiple domains and fragmented sessions.
+• MiniMax-M2.51: A large-scale reasoning model specializing in zero-shot reasoning over extensive contexts.
+• GLM-5/GLM-4.7-Flash[ 13]: GLM-5 is a reasoning model tested by consuming the complete interaction
+history, and GLM-4.7-Flash provides fast inference while maintaining solid reasoning ability.
+• Kimi-K2.5[ 49]: A reasoning model designed for large input windows, evaluated without external retrieval.
+• Qwen3-32B/Qwen2.5-72B/Qwen2.5-14B-1M[ 66]: Reasoning and chat models from the Qwen family,
+offering strong general-purpose reasoning and long-context comprehension.
+•Llama3.3-70B[14]: 70B model in the Llama3 known for reasoning and instruction-following capabilities.
+1https://www.minimax.io/news/minimax-m25
+12
+
+=== PAGE 13 ===
+• Gemini2.5-Flash[ 7]: An instruct model designed to deliver strong generation performance with low latency.
+• GPT-4o-mini[ 35]: A variant of the GPT-4 tailored for efficient conversational reasoning and general tasks.
+Agents with RAG and Memory Systems.To evaluate retrieval-augmented approaches, we implement several
+RAG and structured memory systems with GPT-4o-mini as the backbone response generator.
+• RAG[ 12]: A standard retrieval-augmented generation baseline using BGE-M3 [4] as the dense retriever to
+retrieve top-krelevant dialogue chunks, which are then concatenated as evidence for generation.
+• MemOS[ 25] introduces a memory operating system for LLMs that manages heterogeneous memory types
+through MemCube and provides lifecycle scheduling, storage, and retrieval mechanisms.
+• Mem0[ 6] introduces a scalable memory layer that automatically extracts, compresses, and persistently
+stores salient user information, enabling dynamic long-term personalization across sessions.
+• LightMem[ 10] proposes a lightweight memory-augmented framework inspired by cognitive memory models,
+organizing information into short- and long-term memory stages with efficient compression.
+•Memobase 2 provides a persistent memory system that organizes user preferences across sessions.
+• EverMemOS[ 16] proposes a long-term conversational memory architecture that organizes interaction
+histories into episodic traces and semantic memory structures, enabling reconstructive retrieval for long-
+horizon reasoning.
+•Supermemory 3 uses hierarchical structured memory for retrieval and long-term persona modeling.
+5.1.3 Implementation Details.
+For standalone LLMs, we invoke their APIs. For memory systems, we evaluate both cloud-based and locally
+deployed frameworks. MemOS (v1), Mem0 (v2), Memobase (v1), and Supermemory (v4) are accessed via
+online cloud services forAddandSearchoperations. EverMemOS and Lightmem are deployed locally using
+MongoDB [47] for information storage and Milvus [51] as the vector database. For RAG and memory systems,
+we perform semantic retrieval by fetching the top-10chunks as the default setting, where each chunk in RAG
+is defined as a single user-assistant pair for embedding.
+5.1.4 Human V alidation.
+During event construction, rigorous human validation is performed to ensure that all user preferences are
+explicitly or implicitly manifested within the dialogue histories (see Section 4.1 and Figure 2). This process
+guarantees the foundational integrity of the dataset. Furthermore, we conduct a human evaluation of the
+MCQ options to verify their quality. Given the ground-truth dialogue history, human experts achieve an
+impressive 97.75% accuracy on the tasks, demonstrating high alignment between the task objectives and the
+provided dialogue data.
+Beyond the MCQ tasks, human experts evaluate additional content generation aspects using the criteria
+protocol detailed in Figure 20. Specifically, we assess whether the constructed events accurately cover the goals
+and descriptions specified in the timeline entries (as described in Section 4.1.1), yielding a near-perfect score
+of 1.99/2. Regarding the injection of text variability, experts find that 98% of the generations successfully
+adhere to the designated noise types, confirming the efficacy of our text variability injection process.
+5.2 Overall Performance
+The empirical performance of all evaluated models across single- and multi-domain tasks, under bothClean
+andNoisescenarios, is detailed in Tables 4 through 7. We analyze the persona state across temporal depth
+and compare different models and memory systems from multiple perspectives, including MCQ task accuracy
+2https://www.memobase.io/
+3https://supermemory.ai/research
+13
+
+=== PAGE 14 ===
+T able 4Performance comparison inCleansetting. We group metrics into four aspects.Boldand underlined values
+denote the best and second-best results within each category.
+Baseline MCQ Acc. Memory Fidelity Search Efficiency Interactive Evaluation
+BER T-f1 Memory Score Context T oken↓Duration (ms)↓Completion User T oken↓T urn=1 T urn≤2
+Standalone LLM (Reasoning model)
+MiniMax-M2.5 0.797 - - 34078.6 - - - - -
+GLM-5 0.811 - - 34078.6 - - - - -
+Kimi-K2.50.882- - 34078.6 - - - - -
+Standalone LLM (Chat model)
+Qwen3-32B 0.870 - - 34078.6 - - - - -
+Qwen2.5-72B 0.790 - - 34078.6 - - - - -
+Qwen2.5-14B-1M 0.759 - - 34078.6 - - - - -
+Llama3.3-70B 0.818 - - 34078.6 - - - - -
+Gemini2.5-Flash 0.870 - - 34078.6 - - - - -
+GLM-4.7-Flash 0.868 - - 34078.6 - - - - -
+GPT-4o-mini 0.780 - - 34078.6 - - - - -
+RAG & Memory System based on GPT-4o-mini
+RAG (BGE-M3) 0.7020.8591.89 928.8 16.2 0.830 61.9 0.461 0.797
+MemOS0.8110.830 2.27709.1 369.1 0.842 60.70.5480.801
+Mem0 0.686 0.781 1.91 340.1 557.0 0.797 69.4 0.475 0.775
+Lightmem 0.657 0.792 1.83 297.3 8.50.794 62.3 0.532 0.813
+Memobase 0.733 0.781 1.86 1033.3 1991.0 0.80459.20.5040.830
+EverMemOS 0.728 0.827 2.08 3230.5 16666.50.84660.0 0.508 0.790
+Supermemory 0.655 0.799 1.8494.32881.7 0.804 65.9 0.501 0.804
+(MCQ Acc.), memory fidelity (BERT-f1, Memory Score), Search efficiency (Search Tokens and Duration), and
+interactive success rates (Completion,User Tokenusage,Turn = 1,Turn≤2).
+5.2.1 Performance on Clean Interactions
+Table 4 and Figure 3 present a comprehensive comparison of standalone LLMs and personalized memory
+agents under theCleansetting. From these results, we derive the following observations:
+1. Reasoning Models vs. Chat Models.Reasoning models demonstrate a clear advantage in maintaining
+persona state consistency. Specifically, Kimi-K2.5 achieves the highestMCQ Acc. (0.882), followed by
+Qwen3-32B (0.870) and Gemini2.5-Flash (0.870). It suggests that thinking capabilities are essential for
+synthesizing user preferences and episodic information from interaction dialogue histories.
+2. Performance and Efficiency of Memory Systems.Memory systems present a compelling alternative for
+resource-constrained applications. Notably, Supermemory and Lightmem compress the context tokens to
+fewer than 300, representing a reduction of over 99% raw content. However, we find these two systems
+sacrifice task fulfillment for context compression, underperforming even compared to vanilla RAG. Among
+the evaluated methods, MemOS achieves an effective balance of the performance-efficiency trade-off,
+obtaining the highestMCQ Acc. (0.811) and Memory Score (2.27) while consuming fewerContext Token
+(709.1) than vanilla RAG (828.8).
+Additionally, EverMemOS attains a highCompletion rate (0.846), it incurs substantial search latency
+when deployed locally (16s), which limits its applicability under time-sensitive scenarios. In contrast,
+locally deployed vanilla RAG spends only16mson retrieval and obtains competitive success rates (0.830).
+Furthermore, the interactive evaluation—captured byTurn=1 and Turn≤2 metrics—reveals distinct be-
+havioral patterns among the memory systems. MemOS achieves the highestTurn=1 success rate (0.548),
+indicating that its retrieved persona state more effectively enables agents to provide preference-satisfied
+14
+
+=== PAGE 15 ===
+Figure 3Performance comparison of memory systems across evaluation checkpoints in theCleansetting (Single).
+(Left) MCQ Acc. across three checkpoint types. (Right)Memory Score across the checkpoint types. From Type 1 to
+Type 3, temporal depth and cross-domain interference of the dialogue history increase (see Definition 2 for checkpoint
+type specification).
+responses in a one-shot manner. In contrast, while Memobase and Lightmem lag in immediate resolution,
+they lead inTurn≤2 performance (Memobase:0.830and Lightmem:0.813). This suggests that while the
+responses provided by them are initially suboptimal, their persona states possess strong recovery capabilities,
+allowing agents to reach the desired response with just a single round of user feedback. Conversely, Mem0
+exhibits the lowest Turn≤2 success rate, implying that its persona state often requires extensive user
+involvement and multiple clarification rounds to resolve the task.
+3. RAG vs. Memory Systems.RAG achieves the highest BERT-f1 score (0.849), indicating that most
+key information can be successfully retrieved via dense semantic matching. However, because these
+retrieved dialogue fragments are often disjointed and unorganized, the downstream model struggles to
+reconstruct a coherent persona state. In contrast, advanced memory systems (e.g., MemOS) effectively
+link related information and integrate temporal structures into a unified persona. This structured
+representation substantially alleviates the cognitive and synthesis burden on the response-generating LLM.
+Consequently, advanced memory systems significantly outperform RAG, as evidenced by superiorMCQ Acc.
+andCompletionrates.
+4. Performance across Different T emporal Depths.Figure 3 demonstrates the robustness of persona tracking
+by comparing performance across three types of evaluation checkpoints (Types 1–3). We utilizeType
+1 (Zero-Memory) accuracy as a non-personalized baseline, representing the model’s zero-shot capability.
+Across all evaluated systems, accuracy consistently declines fromType 2 (In-Time) to Type 3 (Post-
+Intervention), suggesting that increased dialogue depth amplifies memory interference and undermines
+coherent persona maintenance.Memory Scores for Memobase and LightMem exhibit a pronounced drop in
+the Type 3, indicating a strong recency bias where late-stage inputs break long-term persona maintenance.
+In contrast, MemOS achieves good and stable performance throughout the interaction, demonstrating
+architectural robustness against a long interaction history.
+5.2.2 Comparative Analysis: Clean vs. Noisy Settings
+To assess the robustness of different architectures under realistic interaction conditions, we further extend
+our evaluation to aNoisysetting. Specifically, we inject text variability as in-session noise while maintaining
+the original user intent (see Section 4.2). By jointly analyzing the results reported in Table 4 and Table 5,
+together with the visualization in Figure 4, we identify several critical findings.
+1. Robustness of Standalone LLMs against T ext V ariability .Many standalone LLMs maintain comparable
+performance when in-session noise is introduced. As shown in Figure 4 (1), Gemini 2.5-Flash demonstrates
+15
+
+=== PAGE 16 ===
+T able 5Performance comparison inNoisesetting. We evaluate baselines from multiple perspectives, consistent with
+Clean setting.Boldand underlined values denote the best and second-best results within each category, respectively.
+Baseline MCQ Acc. Memory Fidelity Search Efficiency Interactive Evaluation
+BER T-f1 Memory Score Context T oken↓Duration (ms)↓Completion User T oken↓T urn=1 T urn≤2
+Standalone LLM (Reasoning model)
+MiniMax-M2.5 0.797 - - 35585.9 - - - - -
+GLM-5 0.813 - - 35585.9 - - - - -
+Kimi-K2.5 0.865 - - 35585.9 - - - - -
+Standalone LLM (Chat model)
+Qwen3-32B 0.877 - - 35585.9 - - - - -
+Qwen2.5-72B 0.792 - - 35585.9 - - - - -
+Qwen2.5-14B-1M 0.766 - - 35585.9 - - - - -
+Llama3.3-70B 0.820 - - 35585.9 - - - - -
+GLM-4.7-Flash 0.853 - - 35585.9 - - - - -
+Gemini2.5-Flash0.879- - 35585.9 - - - - -
+GPT-4o-mini 0.766 - - 35585.9 - - - - -
+RAG & Memory System based on GPT-4o-mini
+RAG (BGE-M3) 0.719 0.8521.92 933.4 16.9 0.811 60.9 0.466 0.787
+MemOS0.8530.844 2.381486.7 644.50.837 56.9 0.567 0.837
+Mem0 0.660 0.779 1.87 337.1 492.6 0.818 68.7 0.470 0.754
+Lightmem 0.671 0.791 1.88 292.9 8.00.820 61.4 0.520 0.806
+Memobase 0.683 0.772 1.87 1061.0 1721.5 0.785 61.2 0.551 0.787
+EverMemOS 0.695 0.824 2.09 3177.8 19246.9 0.811 60.4 0.489 0.773
+Supermemory 0.674 0.796 1.9692.63883.6 0.806 62.0 0.501 0.811
+GPT-4o-mini
+Qwen2.5-72B
+Llama3.3-70B
+GLM-4.7-Flash
+Kimi-K2.5
+GLM-5
+MiniMax-M2.5
+Qwen3-32B
+Gemini2.5-Flash
+Qwen2.5-14B-1M
+0.72
+0.80
+0.88
+Standalone LLMs: Acc.
+Clean
+Noise
+RAG
+MemOS
+Mem0
+LightmemMemobase
+EverMemOS
+Supermemory
+0.64
+0.72
+0.80
+0.88
+Memory Systems: Acc.
+RAG
+MemOS
+Mem0
+LightmemMemobase
+EverMemOS
+Supermemory
+0.44
+0.48
+0.52
+0.56
+Memory Systems: Turn 1 Rate
+Figure 4Comprehensive comparison of model and memory system performance across Clean and Noise single-domain
+scenarios: (Left) MCQ Acc. of standalone LLMs, (Center)MCQ Acc. of memory systems based on GPT-4o-mini,
+(Right)Turn=1Success Rate of memory systems.
+superior handling of noisy contexts, maintaining high accuracy (0.879). In contrast, while Kimi-K2.5 excels
+inCleanscenarios (0.882), its performance drops to0.865. It is thus more susceptible to such distraction
+compared to Gemini.
+2. Noise as a Semantic Catalyst for Memory Systems.Memory systems exhibit improved performance
+in the noisy setting. Further investigation shows that in-session noise acts as an internal conflict that
+emphasizes preference information, thereby facilitating more effective extraction. This is consistent with
+the findings reported in PrefEval [75]. An example is MemOS, whose retrieval volume nearly doubles from
+16
+
+=== PAGE 17 ===
+T able 6Performance comparison in theCleansetting (Multi-domain). We use multi-domain user queries to
+evaluate baselines across three paradigms, consistent with the Clean setting.
+Baseline MCQ Acc. Memory Fidelity Search Efficiency Interactive Evaluation
+BER T-f1 Memory Score Context T oken↓Duration (ms)↓Completion User T oken↓T urn=1 T urn≤2
+Standalone LLM (Reasoning model)
+MiniMax-M2.5 0.860 - - 34078.6 - - - - -
+GLM-5 0.885 - - 34078.6 - - - - -
+Kimi-K2.50.955- - 34078.6 - - - - -
+Standalone LLM (Chat model)
+Qwen3-32B 0.936 - - 34078.6 - - - - -
+Qwen2.5-72B 0.815 - - 34078.6 - - - - -
+Qwen2.5-14B-1M 0.873 - - 34078.6 - - - - -
+Llama3.3-70B 0.682 - - 34078.6 - - - - -
+GLM-4.7-Flash 0.828 - - 34078.6 - - - - -
+Gemini2.5-Flash 0.898 - - 34078.6 - - - - -
+GPT-4o-mini 0.707 - - 34078.6 - - - - -
+RAG & Memory System based on GPT-4o-mini
+RAG (BGE-M3) 0.6820.8491.78 858.1 16.5 0.745122.6 0.204 0.561
+MemOS0.7320.8192.14664.7 364.2 0.643 113.3 0.306 0.592
+Mem0 0.650 0.785 1.78 339.5 525.3 0.694 129.7 0.280 0.529
+Lightmem 0.605 0.795 1.78 289.9 8.50.643 129.2 0.274 0.580
+Memobase 0.694 0.793 1.71 1033.2 2228.0 0.650102.4 0.331 0.656
+EverMemOS 0.713 0.820 1.98 3134.4 15847.0 0.688 115.2 0.268 0.573
+Supermemory 0.656 0.803 1.7292.43232.3 0.675 125.4 0.248 0.554
+709.1tokens (Clean) to1486.7tokens (Noise). This expanded context provides a more detailed description
+of user preferences, leading to an increase inMemory Score(2.27→2.38) andMCQ Acc.(0.811→0.853).
+5.2.3 Comparative Analysis: Single Domain vs. Multi-Domain.
+In this section, we extend our evaluation to the multi-domain queries to examine the agents’ capability in
+synthesizing information cross-domains (Table 6). The transition from single to multi-domain query reveals a
+significant performance gap. Our findings are:
+1. Overall Performance of Multi-Domain Queries.As shown in Table 6, all memory system-based agents
+experience a pronounced decline in performance compared to the single-domain tasks. It is particularly
+evident in interactive metrics, where the success rate at the first attempt (Turn=1) has declined significantly,
+meanwhile the averageUser Tokencount has increased.
+2. Cross-Domain Interference and Evaluation Limitations.As shown in Figure 5 (1), in the single-domain
+tasks, standalone LLMs may not perform worse at Type 3 checkpoints with longer dialogue histories
+compared with Type 2 checkpoints. This phenomenon suggests that the presence of irrelevant tokens does
+not necessarily obstruct the LLM’s ability to retrieve and utilize task-relevant information. Instead, the
+model appears capable of filtering or tolerating moderate noise when the contextual structure remains
+simple and domain boundaries are clear.
+However, this robustness does not generalize to multi-domain tasks (Figure 5 (2)). As noise increases,
+performance deteriorates consistently across most LLMs, indicating the difficulty of synthesizing information
+across domains in a long context. In particular, Llama3.3-70B exhibits a sharp performance drop, reflecting
+susceptibility to irrelevant information when contexts and dialogues are interleaved.
+Beyond this degradation, we observe a clear divergence between option accuracyMCQ Acc. and interactive
+performance as well asMemory Score in memory systems. While memory system-based agents maintain
+17
+
+=== PAGE 18 ===
+GPT-4o-mini GLM-5
+MiniMax-M2.5Qwen3-32BGemini2.5-FlashQwen2.5-72BLlama3.3-70BQwen2.5-14B-1M
+Kimi-K2.5
+0.60
+0.65
+0.70
+0.75
+0.80
+0.85
+0.90
+0.95
+1.00Score
+Standalone LLMs: Acc. Change
+T ype 2
+T ype 3
++5.4%
++0.7%
++4.6%
++5.7% +1.2%
+-0.7%
+-7.1%
+-2.5%
+-0.6%
+GPT-4o-mini GLM-5
+MiniMax-M2.5Qwen3-32BGemini2.5-FlashQwen2.5-72BLlama3.3-70BQwen2.5-14B-1M
+Kimi-K2.5
+0.60
+0.65
+0.70
+0.75
+0.80
+0.85
+0.90
+0.95
+1.00Score
+Standalone LLMs: Acc. Change
+T ype 2
+T ype 3
+-2.8%
+-0.1%
+-1.8%
+-3.0%
+-3.5%
+-4.3%
++6.9%
+-1.9%
+Figure 5 MCQ Acc. of standalone LLMs at different evaluation checkpoints. Results are categorized by single-domain
+(Left) and (Right) multi-domain settings.
+Figure 6(Left) Accuracy ( MCQ Acc.) across checkpoints inCleansetting (Multi), where the dashed line represents
+the baseline performance under information omission (Type 1). (Right) Memory Scores across the event types.
+relatively stable accuracy (Table 6, Figure 6 (2)), both their memory scores and response quality decline
+substantially under the same conditions. This indicates that selecting the correct option from predefined
+candidates is considerably easier than generating a reasoned answer through multi-step inference. Moreover,
+since the memory score primarily reflects retrieval precision, successful recall of key preferences can enable
+downstream reasoning to compensate for irrelevant context, partially hiding degradation in memory quality.
+These findings highlight a limitation of prior evaluations: option accuracy alone is insufficient to characterize
+the effectiveness of memory in multi-domain tasks.
+3. Recall Robustness of Memory Systems vs. RAG.As shown in Figure 6, the effectiveness of memory
+systems varies across different evaluation checkpoints. While the introduction of irrelevant information
+reduces retrieval precision, memory systems maintain high recall of task-relevant preference signals due
+to their structured persona-state representation. In contrast, RAG relies on semantic similarity-based
+retrieval, making it susceptible to interference from irrelevant context and leading to a performance decline.
+4. Retrieval Expansion and Structural Limitations.To better support multi-domain queries that require
+broader evidence aggregation, we expand the number of retrieved items from 10 to 20. However, this
+expansion leads to performance degradation in most memory systems, as illustrated in Figure 7. Since these
+memory systems rely on compressed persona-state representations, the inclusion of excessive irrelevant
+18
+
+=== PAGE 19 ===
+Figure 7Analysis of retrieval depth (Top-k) on multi-domain performance. (Left) Comparison ofMCQ Acc. between
+the Top-10 (Base) and Top-20 settings. (Right)Turn=1Score comparison across representative memory systems.
+MiniMax-M2.5
+GLM-5
+Kimi-K2.5
+Qwen3-32B
+Qwen2.5-72B
+Qwen2.5-14B-1M
+Llama3.3-70B
+GLM-4.7-Flash
+Gemini2.5-Flash
+GPT-4o-mini
+0.60
+0.75
+0.90
+Standalone LLMs: Acc.
+Clean
+Noise
+RAG
+MemOS
+Mem0
+LightmemMemobase
+EverMemOS
+Supermemory
+0.60
+0.66
+0.72
+0.78
+Memory Systems: Acc.
+RAG
+MemOS
+Mem0
+LightmemMemobase
+EverMemOS
+Supermemory
+0.20
+0.25
+0.30
+0.35
+Memory Systems: Turn 1 Rate
+Figure 8Comprehensive comparison of model performance across Clean and Noise multi-domain scenarios: (Left)
+MCQ Acc.of standalone LLMs, (Center)MCQ Acc.and (Right)Turn=1Success Rate of memory systems.
+Figure 9Variation and performance gap of baselines inTurn=1interaction across stages under different settings.
+information may introduce noise that interferes with downstream reasoning. In contrast, standard RAG
+benefits significantly from increased retrieval depth. Since RAG retrieves semantic fragments that may
+lack contextual completeness, retrieving more candidates improves coverage of missing situational details.
+These findings reveal that current memory systems rely on fixed retrieval memory segments and cannot
+adapt retrieval precision to varying task difficulty and information demands.
+19
+
+=== PAGE 20 ===
+T able 7Performance comparison in theNoisesetting (Multi-domain). We use multi-domain user queries to
+evaluate baselines across three paradigms, consistent with the Noise setting.
+Baseline MCQ Acc. Memory Fidelity Search Efficiency Interactive Evaluation
+BER T-f1 Memory Score Context T oken↓Duration (ms)↓Completion User T oken↓T urn=1 T urn≤2
+Standalone LLM (Reasoning model)
+MiniMax-M2.5 0.866 - - 35585.9 - - - - -
+GLM-5 0.905 - - 35585.9 - - - - -
+Kimi-K2.50.930- - 35585.9 - - - - -
+Standalone LLM (Chat model)
+Qwen3-32B0.930- - 35585.9 - - - - -
+Qwen2.5-72B 0.841 - - 35585.9 - - - - -
+Qwen2.5-14B-1M 0.841 - - 35585.9 - - - - -
+Llama3.3-70B 0.656 - - 35585.9 - - - - -
+GLM-4.7 Flash 0.841 - - 35585.9 - - - - -
+Gemini2.5-Flash0.930- - 35585.9 - - - - -
+GPT-4o-mini 0.720 - - 35585.9 - - - - -
+RAG & Memory System based on GPT-4o-mini
+RAG (BGE-M3) 0.6690.8451.85 864.8 16.8 0.732120.3 0.229 0.529
+MemOS0.7520.8162.17680.6 360.6 0.650 121.7 0.268 0.580
+Mem0 0.662 0.785 1.77 332.4 555.9 0.650 137.3 0.210 0.522
+Lightmem 0.631 0.795 1.77 287.8 9.10.656110.80.236 0.611
+Memobase 0.643 0.796 1.72 1038.0 1645.2 0.701 112.8 0.2740.580
+EverMemOS 0.732 0.820 1.98 3092.9 26227.5 0.713 114.0 0.268 0.522
+Supermemory 0.637 0.803 1.7590.73606.1 0.675 122.3 0.2480.612
+5.2.4 Performance Dynamics in Multi-Domain Noise Scenarios
+In the multi-domain noise environment, the performance of standalone LLMs diverges significantly from
+memory systems-based agents, revealing critical insights into reasoning capacity and retrieval efficiency.
+1. Performance of Standalone LLMs.As indicated in Table 7, standalone LLMs with enhanced reasoning
+capability, such as Kimi-K2.5, demonstrate substantial resilience to text variability and the complexity of
+multi-domain queries, maintaining a robustMCQ Acc. of0.930. It suggests that advanced reasoning is
+a pivotal driver in stable preference formation, especially navigating environments with high contextual
+entropy. In contrast, chat models such as Llama3.3-70B suffer a performance degradation, with accuracy
+falling to0.656. highlighting a significant susceptibility to complex tasks with high contextual entropy.
+2. Performance Changes in Interactive Scenarios.Figure 8 shows the performance fluctuations of memory
+system-based agents compared to standalone LLMs in the presence of noise. Notably, memory systems
+exhibit higher sensitivity, particularly during interactive tasks where response accuracy drops after noise is
+introduced. This degradation is more pronounced than that observed in the single-domain setting shown
+in Figure 4. These results suggest that while current memory systems decompose queries [31] and rerank
+retrieved memory, they still struggle to integrate and properly order information across domains when
+dealing with noisy environments.
+Finally, taking a holistic view of Figure 9, we observe that, when comparing performance between the Type 3
+and Type 2 positions, memory systems generally maintain stableTurn=1 performance and remain largely
+robust to token-level noise introduced by irrelevant dialogue. Moreover, relative to the no-memory baseline
+(Type 1), they achieve consistent and steady improvements. However, compared to the single-domain
+tasks, the disparity among different memory systems becomes more pronounced in the multi-domain
+evaluation, particularly at the Type 2 position, suggesting that memory systems differ in their sensitivity
+to cross-domain complexity.
+20
+
+=== PAGE 21 ===
+T able 8Performance under the style-aligned long-context setting across both single- and multi-domain tasks. For
+single-domain evaluation, values in parentheses denote results obtained using linguistically aligned queries without
+incorporating real-data padding into the context.Acc. denotes MCQ accuracy. Search Duration is measured in
+milliseconds (ms).
+Baseline Single-Domain Multi-Domain
+Acc. Context T oken↓Search Duration↓T urn=1 T urn≤2 Acc. Context T oken↓Search Duration↓T urn=1 T urn≤2
+Standalone LLMs
+Qwen2.5-1M 0.716 (0.766) 116541.5 - - - 0.726 116541.5 - - -
+GPT-4o-mini 0.0 (0.775) 116541.5 - - - 0.0 116541.5 - - -
+RAG & Memory System based on GPT-4o-mini
+RAG (BGE-M3) 0.697 (0.707) 962.3 17.5 0.440 0.757 0.650 857.6 20.1 0.217 0.522
+MemOS0.813(0.809) 647.7 276.30.563 0.839 0.764644.1 370.00.331 0.637
+Mem0 0.681 (0.669) 299.4 526.2 0.492 0.790 0.637 333.3 588.2 0.210 0.465
+Lightmem 0.645 (0.638) 293.7 8.40.497 0.809 0.592 291.1 8.20.255 0.580
+Memobase 0.700 (0.719) 1031.0 1479.9 0.551 0.816 0.707 1034.7 1607.2 0.274 0.573
+EverMemOS 0.740(0.707) 3307.2 13258.1 0.501 0.785 0.720 3185.7 10419.0 0.274 0.561
+Supermemory 0.671 (0.662)119.63412.8 0.527 0.801 0.586116.13812.5 0.255 0.541
+Figure 10 MCQ Acc. performance trends of approaches across different segment positions in single-domain tasks
+under Clean and Noisy settings.
+3. Efficiency Changes in Multi-domain Noisy Scenarios.Efficiency metrics show that the introduction of
+noise leads to a substantial increase in computational overhead. As shown in Table 7, theSearch Duration
+of EverMemOS rises to26s, significantly higher than in the clean multi-domain setting, suggesting that
+semantic noise increases the difficulty of retrieval and preference synthesis. In contrast, Lightmem maintains
+a consistently low latency of9.1ms, indicating better scalability under noisy conditions.
+5.3 F urther Analysis
+5.3.1 Performance under Linguistic Style-aligned Long Contexts
+To evaluate the limits of standalone LLMs and memory systems, we extend our experiments to a long context
+setting with an average length of 116k tokens. This setup simulates large-scale interaction histories and
+stress-tests models’ ability to maintain effective memory under extreme context lengths. Following the pipeline
+described in Section 4.2.2, we align the user queries of theCleansetting with real-world conversational styles
+and populate the context with authentic dialogue segments sampled from WildChat [76].
+1. The Impact of Stylistic Interference and T oken-level Noise.In the single-domain task performance
+shown in Figure 8, comparing the base metrics (Clean setting in Table 4) to the style-aligned results shows
+21
+
+=== PAGE 22 ===
+Figure 11(Left) Heatmap of MCQ Acc. across diverse users, highlighting how persona uniqueness influences system
+success regardless of context length. (Right)MCQ Acc.trends across positions in style-aligned long context settings.
+that the performance of most memory systems remains largely unchanged. This suggests that, as long as
+preference information and task requirements are preserved, variations in linguistic style have a limited
+impact on long-context understanding.
+In contrast, the introduction of substantial irrelevant token noise reveals divergent behaviors between
+standalone LLMs and memory systems. For GPT-4o-mini, the model fails to respond under long dialogue
+inputs. Similarly, Qwen2.5-14B-1M, despite being fine-tuned on ultra-long contexts, exhibits a performance
+decline (from0.766to0.716). Memory systems, however, maintain stable performance, highlighting their
+robustness to token-level noise that is less relevant to personal preference.
+2. Persona State Consistency in Long-Context Multi-Domain Settings.The multi-domain setting exposes
+the fragility of most memory systems. While MemOS is the top-performing system with anMCQ Acc. of
+0.764, and its interaction performance also shows improvement compared to the Clean version (Turn=1:
+0.306 → 0.331; Turn≤2:0.592 → 0.637). Systems like Supermemory and Mem0 witness a performance
+collapse (falling below0.60). This divergence suggests that maintaining persona consistency over 100k+
+tokens requires resilient state tracking rather than simple semantic matching. Further analysis of memory
+content in Appendix B shows that, although these systems improve token efficiency relative to MemOS,
+they primarily record episodic memories and fail to abstract and consolidate specific facts or preferences.
+3. User V ariability and Long-Context Degradation.Figure 11 reveals that performance is non-uniform
+across different user profiles, highlighting the diversity present in the dialogues. As the context length
+increases, Figure 11(2) illustrates a catastrophic performance degradation beyond the 60% position
+(approximately 73k tokens), where the base model (GPT-4o-mini) reaches the limits of its effective context
+processing capability and ultimately fails at the 100% mark. In contrast, memory systems such as MemOS
+exhibit remarkable stability. By transforming the global long-context reasoning problem into a persona-state
+matching task, MemOS effectively bypasses the physical context window limitations of the underlying
+LLM, thereby sustaining high accuracy even at extreme context length.
+4. Robustness under Positional Probing.Compared to prior work that evaluates preference at a fixed
+position, we assess the model’s ability to maintain multiple preferences across diverse positions through
+event-driven persona state evolution. In contrast to the global query evaluation in Figure 11 (2), the results
+in Table 9 specifically focus on queries associated with previously emerged domain events, measuring the
+variation inMCQ Acc. across positional checkpoints from 10% to 100% depth. While some memory systems
+experience slight performance variance within the median depth range, MemOS maintains superior and
+stable accuracy, surpassing even the Qwen2.5-14B-1M. This stability suggests that its indexing mechanism
+successfully handles semantic overlap and retrieval interference in dense context segments.
+22
+
+=== PAGE 23 ===
+T able 9 MCQ Acc. across Positions. #Ques. denotes the number of questions whose corresponding domain events
+have already appeared.Boldand underlined values denote the best and second-best results within segment position.
+Pos.% Qwen2.5-1M GPT-4o-mini RAG EverMemOS Lightmem Mem0 Memobase Supermemory MemOS #Ques.
+Performance (Clean)
+10 0.7030.7570.676 0.730 0.676 0.595 0.730 0.649 0.676 37
+200.7650.728 0.728 0.728 0.679 0.679 0.716 0.6540.76581
+30 0.757 0.729 0.730 0.720 0.645 0.664 0.738 0.6450.785107
+40 0.727 0.758 0.727 0.695 0.617 0.695 0.695 0.6800.766128
+50 0.708 0.752 0.723 0.715 0.613 0.672 0.708 0.6640.766137
+60 0.736 0.721 0.743 0.729 0.643 0.679 0.721 0.6290.779141
+70 0.731 0.759 0.731 0.731 0.653 0.674 0.716 0.6380.801141
+80 0.723 0.731 0.731 0.731 0.645 0.674 0.723 0.6600.787141
+90 0.716 0.752 0.745 0.716 0.645 0.667 0.738 0.6530.794141
+100 0.731 0.745 0.738 0.723 0.631 0.653 0.688 0.6530.794141
+Performance (Noise)
+10 0.703 0.730 0.730 0.730 0.649 0.703 0.730 0.6760.81137
+20 0.778 0.741 0.704 0.691 0.654 0.728 0.691 0.7040.80381
+30 0.776 0.729 0.701 0.710 0.654 0.710 0.738 0.6360.794107
+40 0.742 0.734 0.680 0.680 0.609 0.695 0.680 0.6480.789128
+50 0.715 0.745 0.693 0.723 0.628 0.657 0.708 0.5990.796137
+60 0.721 0.729 0.707 0.743 0.629 0.671 0.700 0.6290.793141
+70 0.716 0.752 0.716 0.702 0.667 0.653 0.688 0.6380.809141
+80 0.723 0.738 0.738 0.709 0.653 0.681 0.702 0.6530.837141
+90 0.716 0.738 0.745 0.752 0.631 0.667 0.709 0.6170.816141
+100 0.723 0.752 0.745 0.709 0.631 0.674 0.681 0.6530.851141
+Performance (Long-context Style Alignment)
+10 0.756 0.829 0.707 0.707 0.659 0.683 0.707 0.6830.85441
+200.7740.691 0.691 0.726 0.631 0.691 0.679 0.643 0.762 84
+300.7660.720 0.682 0.729 0.636 0.664 0.664 0.6450.776107
+40 0.764 0.732 0.701 0.732 0.606 0.654 0.677 0.6220.772127
+500.7740.708 0.693 0.737 0.620 0.664 0.664 0.620 0.766 137
+600.7860.700 0.686 0.729 0.636 0.650 0.700 0.636 0.721 140
+700.7710.579 0.700 0.707 0.650 0.679 0.671 0.643 0.743 141
+800.7730.603 0.695 0.738 0.645 0.688 0.681 0.660 0.759 141
+900.7730.489 0.702 0.745 0.617 0.702 0.695 0.653 0.759 141
+100 0.695 0.000 0.695 0.731 0.638 0.709 0.695 0.6530.773141
+Figure 12Overall MCQ Acc. across all experimental configurations (Clean, In-session Noise, and Style-aligned
+Long-context): single-domain (Left) and multi-domain (Right) tasks.
+5.3.2 Single-domain vs. Multi-domain Robustness
+Figure 12 provides a comprehensive comparison across different settings, highlighting a performance divergence
+between single-domain and multi-domain tasks. In single-domain tasks (Figure 12 (left)), the style-aligned
+long-context (Long) setting generally acts as a performance bottleneck for most memory systems, such as
+Memobase, where accuracy falls below the Clean setting. This indicates that extended sequences introduce
+interference during retrieval in focused tasks. In multi-domain tasks (Figure 12 (righ)), the trends diverge:
+while RAG and Supermemory exhibit performance degradation under the Long setting, MemOS and Memobase
+instead show improvements over their Clean settings. This suggests that certain architectures benefit from
+the structured data distribution in style-aligned contexts, which helps resolve cross-domain dependencies.
+23
+
+=== PAGE 24 ===
+T able 10Comparison of MCQ accuracy between LLMs and memory system-based agents across 20 domains, highlighting
+the challenges of maintaining consistent performance on heterogeneous tasks.
+Baseline Alarm Book Calendar Event Finance Media Messaging Movie Music Restaurant Shopping T ravel Others
+Longcontext
+MiniMax-M2.5 0.722 0.680 0.744 0.611 0.829 0.689 0.890 0.700 0.800 0.690 0.800 0.800 0.678
+GLM-5 0.744 0.550 0.700 0.689 0.857 0.600 0.860 0.600 0.660 0.590 0.567 0.750 0.691
+Kimi-K2.50.8560.780 0.867 0.833 0.914 0.7330.9800.757 0.810 0.630 0.8330.8700.797
+Qwen3-32B 0.744 0.770 0.844 0.8330.9570.700 0.890 0.743 0.880 0.790 0.833 0.8200.822
+Qwen2.5-72B 0.811 0.770 0.667 0.878 0.900 0.522 0.820 0.629 0.800 0.630 0.811 0.810 0.725
+Qwen2.5-1M 0.811 0.690 0.644 0.833 0.886 0.489 0.850 0.514 0.830 0.550 0.744 0.800 0.709
+Llama3.3-70B 0.589 0.780 0.733 0.700 0.843 0.767 0.870 0.800 0.830 0.740 0.700 0.760 0.709
+GLM-4.7-Flash 0.8330.830 0.8890.767 0.929 0.733 0.8100.8140.8400.8400.856 0.850 0.822
+Gemini2.5-Flash 0.800 0.750 0.8000.9110.9000.7780.890 0.7000.9300.6300.9220.820 0.809
+GPT-4o-mini 0.700 0.770 0.800 0.733 0.786 0.578 0.960 0.671 0.830 0.560 0.678 0.760 0.691
+RAG & Memory System
+Rag 0.689 0.690 0.700 0.667 0.771 0.5330.9500.657 0.800 0.490 0.644 0.710 0.681
+EverMemOS 0.644 0.670 0.767 0.689 0.743 0.5670.9500.671 0.820 0.540 0.611 0.720 0.616
+Lightmem 0.567 0.740 0.744 0.589 0.814 0.556 0.930 0.429 0.750 0.410 0.633 0.710 0.619
+Mem0 0.567 0.660 0.700 0.667 0.757 0.589 0.860 0.529 0.740 0.470 0.678 0.690 0.638
+Memobase 0.667 0.760 0.756 0.678 0.800 0.567 0.900 0.571 0.790 0.520 0.689 0.760 0.641
+MemOS0.732 0.810 0.820 0.821 0.859 0.657 0.950 0.694 0.848 0.719 0.889 0.856 0.777
+Supermemory 0.6670.700 0.722 0.611 0.757 0.500 0.900 0.400 0.760 0.390 0.744 0.720 0.622
+5.3.3 T opic-Specific Adaptation and Domain Expertise
+Table 10 reveals clear domain-specific performance variations across different approaches. Large-scale models
+such as Kimi-K2.5 achieve the strongest results in structured domains like Finance (0.914) and Messaging
+(0.980), where task requirements are relatively stable. Within the memory systems, MemOS narrows the
+gap between plug-in memory-based agents and vanilla models, particularly in the Shopping (0.889) and
+Travel (0.856) domains, demonstrating improved utilization of historical preferences. In contrast, a consistent
+performance drop is observed in the Media and Restaurant domains across all evaluated models. These
+domains typically involve more dynamic and frequently updated user preferences, making them inherently
+more challenging. This suggests that memory should not function solely as a storage of historical interactions
+and preferences, but should be actively leveraged to guide future responses by transforming accumulated
+preference signals into informative priors for inference.
+6 Conclusion
+In this work, we introduce a benchmark that shifts the evaluation of personalized memory agents from static
+preference recall to persona consistency. By constructing temporally ordered interaction events, we propose
+an event-driven framework, PERMA, for assessing LLMs and memory systems under text variability and
+real-world linguistic alignment. Our experiments in single- and multi-domain tasks reveal that most memory-
+based systems outperform RAG by linking related interactions into a persistent persona state. This advantage
+becomes more pronounced in high-entropy settings, where memory systems demonstrate greater robustness and
+achieve 300× higher token efficiency than vanilla long-context models. Notably, while standalone LLMs exhibit
+severe performance degradation when context exceeds their window sizes, memory systems remain stable
+by reducing long-range reasoning to structured persona state matching. Despite these gains, performance
+degradation under multi-domain transitions and conflicting signals reveals a sensitivity to context complexity,
+highlighting the necessity of PERMA. Overall, our findings suggest that, while memory enhances robustness,
+achieving personalized agents requires moving beyond static retrieval toward task-aware memory management
+capable of filtering noise and maintaining long-term coherence, enabling lifelong companionship.
+24
+
+=== PAGE 25 ===
+References
+[1] Qingyao Ai, Yichen Tang, Changyue Wang, Jianming Long, Weihang Su, and Yiqun Liu. Memorybench: A
+benchmark for memory and continual learning in llm systems, 2025. URLhttps://arxiv.org/abs/2510.17281.
+[2] Haonan Bian, Zhiyuan Yao, Sen Hu, Zishan Xu, Shaolei Zhang, Yifu Guo, Ziliang Yang, Xueran Han, Huacan
+Wang, and Ronghao Chen. Realmem: Benchmarking llms in real-world memory-driven interaction, 2026. URL
+https://arxiv.org/abs/2601.06966.
+[3] Tom B. Brown, Benjamin Mann, Nick Ryder, Melanie Subbiah, Jared Kaplan, Prafulla Dhariwal, Arvind
+Neelakantan, Pranav Shyam, Girish Sastry, Amanda Askell, Sandhini Agarwal, Ariel Herbert-Voss, Gretchen
+Krueger, TomHenighan, RewonChild, AdityaRamesh, DanielM.Ziegler, JeffreyWu, ClemensWinter, Christopher
+Hesse, Mark Chen, Eric Sigler, Mateusz Litwin, Scott Gray, Benjamin Chess, Jack Clark, Christopher Berner,
+Sam McCandlish, Alec Radford, Ilya Sutskever, and Dario Amodei. Language models are few-shot learners, 2020.
+URLhttps://arxiv.org/abs/2005.14165.
+[4] Jianlv Chen, Shitao Xiao, Peitian Zhang, Kun Luo, Defu Lian, and Zheng Liu. Bge m3-embedding: Multi-lingual,
+multi-functionality, multi-granularity text embeddings through self-knowledge distillation, 2023.
+[5] Yuhao Chen, Yuanjie Lyu, Shuochen Liu, Chao Zhang, Junhui Lv, and Tong Xu. Think wider, detect sharper:
+Reinforced reference coverage for document-level self-contradiction detection. In Christos Christodoulopoulos,
+Tanmoy Chakraborty, Carolyn Rose, and Violet Peng, editors,Proceedings of the 2025 Conference on Empirical
+Methods in Natural Language Processing, pages 1273–1288, Suzhou, China, November 2025. Association for
+Computational Linguistics. ISBN 979-8-89176-332-6. doi: 10.18653/v1/2025.emnlp-main.67. URL https:
+//aclanthology.org/2025.emnlp-main.67/.
+[6] Prateek Chhikara, Dev Khant, Saket Aryan, Taranjeet Singh, and Deshraj Yadav. Mem0: Building production-
+ready ai agents with scalable long-term memory, 2025. URLhttps://arxiv.org/abs/2504.19413.
+[7] Gheorghe Comanici, Eric Bieber, Mike Schaekermann, et al. Gemini 2.5: Pushing the frontier with advanced
+reasoning, multimodality, long context, and next generation agentic capabilities, 2025. URLhttps://arxiv.org/
+abs/2507.06261.
+[8] Pengfei Du. Memory for autonomous llm agents:mechanisms, evaluation, and emerging frontiers, 2026. URL
+https://arxiv.org/abs/2603.07670.
+[9] Yiming Du, Hongru Wang, Zhengyi Zhao, Bin Liang, Baojun Wang, Wanjun Zhong, Zezhong Wang, and Kam-Fai
+Wong. Perltqa: A personal long-term memory dataset for memory classification, retrieval, and synthesis in
+question answering, 2024. URLhttps://arxiv.org/abs/2402.16288.
+[10] Jizhan Fang, Xinle Deng, Haoming Xu, Ziyan Jiang, Yuqi Tang, Ziwen Xu, Shumin Deng, Yunzhi Yao, Mengru
+Wang, Shuofei Qiao, Huajun Chen, and Ningyu Zhang. Lightmem: Lightweight and efficient memory-augmented
+generation, 2025. URLhttps://arxiv.org/abs/2510.18866.
+[11] Xueyang Feng, Weinan Gan, Xu Chen, Quanyu Dai, and Yong Liu. How does personalized memory shape
+llm behavior? benchmarking rational preference utilization in personalized assistants, 2026. URL https:
+//arxiv.org/abs/2601.16621.
+[12] Yunfan Gao, Yun Xiong, Xinyu Gao, Kangxiang Jia, Jinliu Pan, Yuxi Bi, Yi Dai, Jiawei Sun, Meng Wang,
+and Haofen Wang. Retrieval-augmented generation for large language models: A survey, 2024. URLhttps:
+//arxiv.org/abs/2312.10997.
+[13] GLM-5-Team, :, Aohan Zeng, Xin Lv, Zhenyu Hou, et al. Glm-5: from vibe coding to agentic engineering, 2026.
+URLhttps://arxiv.org/abs/2602.15763.
+[14] Aaron Grattafiori, Abhimanyu Dubey, et al. The llama 3 herd of models, 2024. URLhttps://arxiv.org/abs/
+2407.21783.
+[15] Zexue He, Yu Wang, Churan Zhi, Yuanzhe Hu, Tzu-Ping Chen, Lang Yin, Ze Chen, Tong Arthur Wu, Siru
+Ouyang, Zihan Wang, Jiaxin Pei, Julian McAuley, Yejin Choi, and Alex Pentland. Memoryarena: Benchmarking
+agent memory in interdependent multi-session agentic tasks, 2026. URLhttps://arxiv.org/abs/2602.16313.
+[16] Chuanrui Hu, Xingze Gao, Zuyi Zhou, Dannong Xu, Yi Bai, Xintong Li, Hui Zhang, Tong Li, Chong Zhang, Lidong
+Bing, and Yafeng Deng. Evermemos: A self-organizing memory operating system for structured long-horizon
+reasoning, 2026. URLhttps://arxiv.org/abs/2601.02163.
+25
+
+=== PAGE 26 ===
+[17] Yulin Hu, Zimo Long, Jiahe Guo, Xingyu Sui, Xing Fu, Weixiang Zhao, Yanyan Zhao, and Bing Qin. Op-
+bench: Benchmarking over-personalization for memory-augmented personalized conversational agents, 2026. URL
+https://arxiv.org/abs/2601.13722.
+[18] Yuyang Hu, Shichun Liu, Yanwei Yue, et al. Memory in the age of ai agents, 2025. URLhttps://arxiv.org/
+abs/2512.13564.
+[19] Bowen Jiang, Zhuoqun Hao, Young-Min Cho, Bryan Li, Yuan Yuan, Sihao Chen, Lyle Ungar, Camillo J. Taylor,
+and Dan Roth. Know me, respond to me: Benchmarking llms for dynamic user profiling and personalized responses
+at scale, 2025. URLhttps://arxiv.org/abs/2504.14225.
+[20] Bowen Jiang, Yuan Yuan, Maohao Shen, Zhuoqun Hao, Zhangchen Xu, Zichen Chen, Ziyi Liu, Anvesh Rao
+Vijjini, Jiashu He, Hanchao Yu, Radha Poovendran, Gregory Wornell, Lyle Ungar, Dan Roth, Sihao Chen, and
+Camillo Jose Taylor. Personamem-v2: Towards personalized intelligence via learning implicit user personas and
+agentic memory, 2025. URLhttps://arxiv.org/abs/2512.06688.
+[21] Hannah Rose Kirk, Alexander Whitefield, Paul Röttger, Andrew Bean, Katerina Margatina, Juan Ciro, Rafael
+Mosquera, Max Bartolo, Adina Williams, He He, Bertie Vidgen, and Scott A. Hale. The prism alignment
+dataset: What participatory, representative and individualised human feedback reveals about the subjective and
+multicultural alignment of large language models, 2024. URLhttps://arxiv.org/abs/2404.16019.
+[22] Hao Li, Chenghao Yang, An Zhang, Yang Deng, Xiang Wang, and Tat-Seng Chua. Hello again! llm-powered
+personalized agent for long-term dialogue, 2025. URLhttps://arxiv.org/abs/2406.05925.
+[23] Xiaopeng Li, Pengyue Jia, Derong Xu, Yi Wen, Yingyi Zhang, Wenlin Zhang, Wanyu Wang, Yichao Wang,
+Zhaocheng Du, Xiangyang Li, Yong Liu, Huifeng Guo, Ruiming Tang, and Xiangyu Zhao. A survey of personal-
+ization: From rag to agent, 2025. URLhttps://arxiv.org/abs/2504.10147.
+[24] Yuanchun Li, Hao Wen, Weijun Wang, Xiangyu Li, Yizhen Yuan, Guohong Liu, Jiacheng Liu, Wenxing Xu, Xiang
+Wang, Yi Sun, Rui Kong, Yile Wang, Hanfei Geng, Jian Luan, Xuefeng Jin, Zilong Ye, Guanjing Xiong, Fan
+Zhang, Xiang Li, Mengwei Xu, Zhijun Li, Peng Li, Yang Liu, Ya-Qin Zhang, and Yunxin Liu. Personal llm agents:
+Insights and survey about the capability, efficiency and security, 2024. URLhttps://arxiv.org/abs/2401.05459.
+[25] Zhiyu Li, Chenyang Xi, Chunyu Li, Ding Chen, et al. Memos: A memory os for ai system, 2025. URL
+https://arxiv.org/abs/2507.03724.
+[26] Nelson F. Liu, Kevin Lin, John Hewitt, Ashwin Paranjape, Michele Bevilacqua, Fabio Petroni, and Percy Liang.
+Lost in the middle: How language models use long contexts, 2023. URLhttps://arxiv.org/abs/2307.03172.
+[27] Shuochen Liu, Pengfei Luo, Chao Zhang, Yuhao Chen, Haotian Zhang, Qi Liu, Xin Kou, Tong Xu, and Enhong
+Chen. Look as you think: Unifying reasoning and visual evidence attribution for verifiable document rag via
+reinforcement learning, 2025. URLhttps://arxiv.org/abs/2511.12003.
+[28] Pengfei Luo, Jingbo Zhou, Tong Xu, Yuan Xia, Linli Xu, and Enhong Chen. Imagescope: Unifying language-guided
+image retrieval via large multimodal model collective reasoning, 2025. URLhttps://arxiv.org/abs/2503.10166.
+[29] Yuanjie Lyu, Zhiyu Li, Simin Niu, Feiyu Xiong, Bo Tang, Wenjin Wang, Hao Wu, Huanyong Liu, Tong Xu,
+and Enhong Chen. Crud-rag: A comprehensive chinese benchmark for retrieval-augmented generation of large
+language models, 2024. URLhttps://arxiv.org/abs/2401.17043.
+[30] Shengjie Ma, Chengjin Xu, Xuhui Jiang, Muzhi Li, Huaren Qu, Cehao Yang, Jiaxin Mao, and Jian Guo. Think-
+on-graph 2.0: Deep and faithful large language model reasoning with knowledge-guided retrieval augmented
+generation, 2025. URLhttps://arxiv.org/abs/2407.10805.
+[31] Xinbei Ma, Yeyun Gong, Pengcheng He, Hai Zhao, and Nan Duan. Query rewriting in retrieval-augmented large
+language models. InEMNLP, pages 5303–5315, 2023.
+[32] Adyasha Maharana, Dong-Ho Lee, Sergey Tulyakov, Mohit Bansal, Francesco Barbieri, and Yuwei Fang. Evaluating
+very long-term conversational memory of llm agents, 2024. URLhttps://arxiv.org/abs/2402.17753.
+[33] Wenyu Mao, Haoyang Liu, Zhao Liu, Haosong Tan, Yaorui Shi, Jiancan Wu, An Zhang, and Xiang Wang.
+Collaborative multi-agent optimization for personalized memory system, 2026. URLhttps://arxiv.org/abs/
+2603.12631.
+[34] Abhiman Neelakanteswara, Shreyas Chaudhari, and Hamed Zamani. RAGs to style: Personalizing LLMs with
+style embeddings. In Ameet Deshpande, EunJeong Hwang, Vishvak Murahari, Joon Sung Park, Diyi Yang, Ashish
+26
+
+=== PAGE 27 ===
+Sabharwal, Karthik Narasimhan, and Ashwin Kalyan, editors,Proceedings of the 1st Workshopon Personalization
+of Generative AI Systems (PERSONALIZE 2024), pages 119–123, St. Julians, Malta, March 2024. Association
+for Computational Linguistics. doi: 10.18653/v1/2024.personalize-1.11. URLhttps://aclanthology.org/2024.
+personalize-1.11/.
+[35] OpenAI. Gpt-4o system card, 2024. URLhttps://arxiv.org/abs/2410.21276.
+[36] OpenAI, :, Aaron Jaech, Adam Kalai, Adam Lerer, et al. Openai o1 system card, 2024. URLhttps://arxiv.
+org/abs/2412.16720.
+[37] OpenAI, Josh Achiam, Steven Adler, et al. Gpt-4 technical report, 2024. URLhttps://arxiv.org/abs/2303.
+08774.
+[38] Cheng Qian, Zuxin Liu, Akshara Prabhakar, Zhiwei Liu, Jianguo Zhang, Haolin Chen, Heng Ji, Weiran Yao,
+Shelby Heinecke, Silvio Savarese, Caiming Xiong, and Huan Wang. Userbench: An interactive gym environment
+for user-centric agents, 2025. URLhttps://arxiv.org/abs/2507.22034.
+[39] Hongjin Qian, Zheng Liu, Peitian Zhang, Kelong Mao, Defu Lian, Zhicheng Dou, and Tiejun Huang. Memorag:
+Boosting long context processing with global memory-enhanced retrieval augmentation, 2025.
+[40] Qwen, :, An Yang, Baosong Yang, et al. Qwen2.5 technical report, 2025. URLhttps://arxiv.org/abs/2412.
+15115.
+[41] Kan Ren, Jiarui Qin, Yuchen Fang, Weinan Zhang, Lei Zheng, Weijie Bian, Guorui Zhou, Jian Xu, Yong Yu,
+Xiaoqiang Zhu, and Kun Gai. Lifelong sequential modeling with personalized memorization for user response
+prediction. In Proceedings of the 42nd International ACM SIGIR Conference on Research and Development
+in Information Retrieval, SIGIR ’19, page 565–574. ACM, July 2019. doi: 10.1145/3331184.3331230. URL
+http://dx.doi.org/10.1145/3331184.3331230.
+[42] Alireza Rezazadeh, Zichao Li, Wei Wei, and Yujia Bao. From isolated conversations to hierarchical schemas:
+Dynamic tree memory representation for llms, 2025. URLhttps://arxiv.org/abs/2410.14052.
+[43] Alaa Saleh, Sasu Tarkoma, Anders Lindgren, Praveen Kumar Donta, Schahram Dustdar, Susanna Pirttikangas,
+and Lauri Lovén. Memindex: Agentic event-based distributed memory management for multi-agent systems.
+ACM Trans. Auton. Adapt. Syst., November 2025. ISSN 1556-4665. doi: 10.1145/3774946. URL https:
+//doi.org/10.1145/3774946. Just Accepted.
+[44] Parth Sarthi, Salman Abdullah, Aditi Tuli, Shubh Khanna, Anna Goldie, and Christopher D Manning. RAPTOR:
+Recursive abstractive processing for tree-organized retrieval. InThe TwelfthInternational Conference on Learning
+Representations, 2024.
+[45] Yaorui Shi, Yuxin Chen, Siyuan Wang, Sihang Li, Hengxing Cai, Qi Gu, Xiang Wang, and An Zhang. Look back to
+reason forward: Revisitable memory for long-context llm agents, 2026. URLhttps://arxiv.org/abs/2509.23040.
+[46] Juntao Tan, Liangwei Yang, Zuxin Liu, Zhiwei Liu, Rithesh RN, Tulika Manoj Awalgaonkar, Jianguo Zhang,
+Weiran Yao, Ming Zhu, Shirley Kokane, et al. Personabench: Evaluating ai models on understanding personal
+information through accessing (synthetic) private user data. InFindings of the Association for Computational
+Linguistics: ACL 2025, pages 878–893, 2025.
+[47] Dawei Tao, Enqi Liu, Sidath Randeni Kadupitige, Michael Cahill, Alan Fekete, and Uwe Röhm. First past the
+post: Evaluating query optimization in mongodb, 2024. URLhttps://arxiv.org/abs/2409.16544.
+[48] Mohammad Tavakoli, Alireza Salemi, Carrie Ye, Mohamed Abdalla, Hamed Zamani, and J Ross Mitchell. Beyond
+a million tokens: Benchmarking and enhancing long-term memory in llms, 2026. URLhttps://arxiv.org/abs/
+2510.27246.
+[49] Kimi Team, Tongtong Bai, Yifan Bai, et al. Kimi k2.5: Visual agentic intelligence, 2026. URLhttps://arxiv.
+org/abs/2602.02276.
+[50] Haoye Tian, Chong Wang, BoYang Yang, Lyuye Zhang, and Yang Liu. A taxonomy of prompt defects in llm
+systems, 2025. URLhttps://arxiv.org/abs/2509.14404.
+[51] Jianguo Wang, Xiaomeng Yi, Rentong Guo, et al. Milvus: A purpose-built vector data management system. In
+Proceedings of the 2021 International Conference on Management of Data, SIGMOD ’21, page 2614–2627, New
+York, NY, USA, 2021. Association for Computing Machinery. ISBN 9781450383431. doi: 10.1145/3448016.3457550.
+URLhttps://doi.org/10.1145/3448016.3457550.
+27
+
+=== PAGE 28 ===
+[52] Shuting Wang, Xin Yu, Mang Wang, Weipeng Chen, Yutao Zhu, and Zhicheng Dou. Richrag: Crafting rich
+responses for multi-faceted queries in retrieval-augmented generation. InCOLING, pages 11317–11333, 2025.
+[53] Yu Wang and Xi Chen. Mirix: Multi-agent memory system for llm-based agents, 2025. URLhttps://arxiv.
+org/abs/2507.07957.
+[54] Zhaowei Wang, Wenhao Yu, Xiyu Ren, Jipeng Zhang, Yu Zhao, Rohit Saxena, Liang Cheng, Ginny Wong,
+Simon See, Pasquale Minervini, Yangqiu Song, and Mark Steedman. Mmlongbench: Benchmarking long-context
+vision-language models effectively and thoroughly, 2025. URLhttps://arxiv.org/abs/2505.10610.
+[55] Zora Zhiruo Wang, Jiayuan Mao, Daniel Fried, and Graham Neubig. Agent workflow memory. InForty-second
+International Conference on Machine Learning, 2025. URLhttps://openreview.net/forum?id=NTAhi2JEEE.
+[56] Peter West and Christopher Potts. Base models beat aligned models at randomness and creativity. InSecond
+Conference on Language Modeling, 2025. URLhttps://openreview.net/forum?id=vqN8uom4A1.
+[57] Di Wu, Hongwei Wang, Wenhao Yu, Yuwei Zhang, Kai-Wei Chang, and Dong Yu. Longmemeval: Benchmarking
+chat assistants on long-term interactive memory, 2025. URLhttps://arxiv.org/abs/2410.10813.
+[58] Tingyu Wu, Zhisheng Chen, Ziyan Weng, Shuhe Wang, Chenglong Li, Shuo Zhang, Sen Hu, Silin Wu, Qizhen
+Lan, Huacan Wang, and Ronghao Chen. Knowme-bench: Benchmarking person understanding for lifelong digital
+companions, 2026. URLhttps://arxiv.org/abs/2601.04745.
+[59] Derong Xu, Ziheng Zhang, Zhenxi Lin, Xian Wu, Zhihong Zhu, Tong Xu, Xiangyu Zhao, Yefeng Zheng, and
+Enhong Chen. Multi-perspective improvement of knowledge graph completion with large language models. In
+LREC/COLING, 2024.
+[60] Derong Xu, Xinhang Li, Ziheng Zhang, Zhenxi Lin, Zhihong Zhu, Zhi Zheng, Xian Wu, Xiangyu Zhao, Tong
+Xu, and Enhong Chen. Harnessing large language models for knowledge graph question answering via adaptive
+multi-aspect retrieval-augmentation, 2025. URLhttps://arxiv.org/abs/2412.18537.
+[61] Derong Xu, Yi Wen, Pengyue Jia, Yingyi Zhang, wenlin zhang, Yichao Wang, Huifeng Guo, Ruiming Tang,
+Xiangyu Zhao, Enhong Chen, and Tong Xu. From single to multi-granularity: Toward long-term memory
+association and selection of conversational agents, 2025. URLhttps://arxiv.org/abs/2505.19549.
+[62] Derong Xu, Pengyue Jia, Xiaopeng Li, Yingyi Zhang, Maolin Wang, Qidong Liu, Xiangyu Zhao, Yichao Wang,
+Huifeng Guo, Ruiming Tang, Enhong Chen, and Tong Xu. Align-grag: Anchor and rationale guided dual alignment
+for graph retrieval-augmented generation, 2026. URLhttps://arxiv.org/abs/2505.16237.
+[63] Wujiang Xu, Zujie Liang, Kai Mei, Hang Gao, Juntao Tan, and Yongfeng Zhang. A-mem: Agentic memory for
+llm agents, 2025. URLhttps://arxiv.org/abs/2502.12110.
+[64] Yue Xu, Qian Chen, Zizhan Ma, Dongrui Liu, Wenxuan Wang, Xiting Wang, Li Xiong, and Wenjie Wang.
+Toward personalized llm-powered agents: Foundations, evaluation, and future directions, 2026. URLhttps:
+//arxiv.org/abs/2602.22680.
+[65] Sikuan Yan, Xiufeng Yang, Zuchao Huang, Ercong Nie, Zifeng Ding, Zonggen Li, Xiaowen Ma, Jinhe Bi, Kristian
+Kersting, Jeff Z. Pan, Hinrich Schütze, Volker Tresp, and Yunpu Ma. Memory-r1: Enhancing large language
+model agents to manage and utilize memories via reinforcement learning, 2026. URLhttps://arxiv.org/abs/
+2508.19828.
+[66] An Yang, Anfeng Li, Baosong Yang, et al. Qwen3 technical report, 2025. URLhttps://arxiv.org/abs/2505.
+09388.
+[67] Howard Yen, Tianyu Gao, Minmin Hou, Ke Ding, Daniel Fleischer, Peter Izsak, Moshe Wasserblat, and
+Danqi Chen. Helmet: How to evaluate long-context language models effectively and thoroughly, 2025. URL
+https://arxiv.org/abs/2410.02694.
+[68] Hongli Yu, Tinghong Chen, Jiangtao Feng, Jiangjie Chen, Weinan Dai, Qiying Yu, Ya-Qin Zhang, Wei-Ying Ma,
+Jingjing Liu, Mingxuan Wang, and Hao Zhou. Memagent: Reshaping long-context llm with multi-conv rl-based
+memory agent, 2025. URLhttps://arxiv.org/abs/2507.02259.
+[69] Qianhao Yuan, Jie Lou, Zichao Li, Jiawei Chen, Yaojie Lu, Hongyu Lin, Le Sun, Debing Zhang, and Xianpei Han.
+Memsearcher: Training llms to reason, search and manage memory via end-to-end reinforcement learning, 2025.
+URLhttps://arxiv.org/abs/2511.02805.
+28
+
+=== PAGE 29 ===
+[70] Zhenrui Yue, Honglei Zhuang, Aijun Bai, Kai Hui, Rolf Jagerman, Hansi Zeng, Zhen Qin, Dong Wang, Xuanhui
+Wang, and Michael Bendersky. Inference scaling for long-context retrieval augmented generation, 2025. URL
+https://arxiv.org/abs/2410.04343.
+[71] Chao Zhang, Yuhao Wang, Derong Xu, Haoxin Zhang, Yuanjie Lyu, Yuhao Chen, Shuochen Liu, Tong Xu,
+Xiangyu Zhao, Yan Gao, Yao Hu, and Enhong Chen. Tearag: A token-efficient agentic retrieval-augmented
+generation framework, 2025. URLhttps://arxiv.org/abs/2511.05385.
+[72] Xiaotian Zhang, Yuan Wang, Ruizhe Chen, Zeya Wang, Runchen Hou, and Zuozhu Liu. Towards proactive
+personalization through profile customization for individual users in dialogues, 2025. URLhttps://arxiv.org/
+abs/2512.15302.
+[73] YuxiangZhang, JiangmingShu, YeMa, XueyuanLin, ShangxiWu, andJitaoSang. Memoryasaction: Autonomous
+context curation for long-horizon agentic tasks, 2026. URLhttps://arxiv.org/abs/2510.12635.
+[74] Zeyu Zhang, Xiaohe Bo, Chen Ma, Rui Li, Xu Chen, Quanyu Dai, Jieming Zhu, Zhenhua Dong, and Ji-
+Rong Wen. A survey on the memory mechanism of large language model based agents, 2024. URLhttps:
+//arxiv.org/abs/2404.13501.
+[75] Siyan Zhao, Mingyi Hong, Yang Liu, Devamanyu Hazarika, and Kaixiang Lin. Do llms recognize your preferences?
+evaluating personalized preference following in llms, 2025. URLhttps://arxiv.org/abs/2502.09597.
+[76] Wenting Zhao, Xiang Ren, Jack Hessel, Claire Cardie, Yejin Choi, and Yuntian Deng. Wildchat: 1m chatgpt
+interaction logs in the wild, 2024. URLhttps://arxiv.org/abs/2405.01470.
+[77] Zheng Zhao, Clara Vania, Subhradeep Kayal, Naila Khan, Shay B. Cohen, and Emine Yilmaz. Personalens: A
+benchmark for personalization evaluation in conversational ai assistants, 2025. URLhttps://arxiv.org/abs/
+2506.09902.
+[78] Junhao Zheng, Chengming Shi, Xidi Cai, Qiuke Li, Duzhen Zhang, Chenxing Li, Dong Yu, and Qianli Ma. Lifelong
+learning of large language model based agents: A roadmap, 2025. URLhttps://arxiv.org/abs/2501.07278.
+[79] Junyi Zhu, Shuochen Liu, Yu Yu, Bo Tang, Yibo Yan, Zhiyu Li, Feiyu Xiong, Tong Xu, and Matthew B. Blaschko.
+Fastmem: Fast memorization of prompt improves context awareness of large language models, 2024. URL
+https://arxiv.org/abs/2406.16069.
+29
+
+=== PAGE 30 ===
+Appendix
+A Prompt
+To establish a realistic foundation for evaluation, the framework utilizes data construction prompts that
+simulate the evolution of user preferences. By leveraging TIMELINE_GENERATION in Figure 13, the
+system generates interaction timelines, modeling how user interests emerge and deepen. These timelines are
+then transformed into naturalistic dialogues via the DIALOGUE_GENERATION prompts in Figure 15,
+which guide the LLMs to reveal preferences through feedback or corrections, thereby mirroring the ambiguity
+of real-world interactions.
+Building upon this data, the framework transitions to a dynamic interactive simulation driven by the User
+simulator. As the interaction unfolds, the USER_FEEDBACK_PROMPT in Figure 16 provides the user’s
+responses, enabling the agent to provide adaptive feedback. This mechanism allows the simulated user to
+clarify intent or correct the assistant based on history, creating a test of the assistant’s ability to maintain
+consistency and adapt to user guidance in real-time.
+Finally, to quantify agent performance, the module implements a standardized “LLM-as-a-Judge” evaluation.
+We score the assistant’s responses on quality and personalized memory (EVAL_MEMORY_SCORE in
+Figure 19). Crucially, the system assesses memory precision, verifying the retrieval of details against ground
+truth. OPTION_GENERATION_PROMPT in Figure 18 synthesizes challenging multiple-choice questions
+with options that are plausible but intentionally misaligned with user preferences or facts, thereby testing the
+agent’s discriminative ability in noisy environments.
+B Case Study
+In this section, we present a case study comparing the retrieved memory of different systems to provide a clearer
+horizontal evaluation. As illustrated in Table 11–12, we can intuitively observe the retrieved memory results of
+various systems for the same query: MemOS categorizes memory into three distinct dimensions—episodic facts,
+explicit preferences, and implicit preferences—utilizing a parallel retrieval mechanism that effectively addresses
+the three categories of challenges inherent in preference-driven scenarios; meanwhile, Mem0, Memobase,
+and EverMemOS prioritize the concatenation of episodic memories, which makes them better suited as
+personal assistants for querying historical records but leaves them relatively weak in preference extraction
+and processing; conversely, Supermemory leans toward highly abstracted preference extraction but fails to
+reconstruct the specific details of relevant events along the timeline.
+30
+
+=== PAGE 31 ===
+TIMELINE_GENERATION
+You are a professional expert in user behavior analysis. Your task is to convert summarized user-assistant interactions into a
+coherent timeline of preference development events. Please make sure to consider user demographics and extend the content
+appropriately based on user preferences.
+## User Profile Information
+- User Demographic Profile: {demographic_profile}
+## Summarized Interaction History:{topic_interactions}
+- Relevant Domain: {selected_topics}
+("Relevant Domain" refers to the topic domain that appeared in the current interactions, indicating the area in which the
+user shows interest or preference.)
+The order of interactions represents their chronological sequence, and each interaction includes a description of the user’s
+preferences and possible events related to that domain.
+## Timeline Generation Requirements
+1. Date Span: Generate events over a 1-6 month period **in chronological order**, showing natural preference development.
+Each event should have a specific time of day: Morning, Afternoon, or Evening, based on the interaction context.
+2. Event Types: Only include two types of events — "preference_emergence" and "preference_supplement".
+- preference_emergence: The first interaction and initial interest in a domain.
+- preference_supplement: A supplement, deepening, or change in the user’s existing preferences **after they have already
+discovered the domain**.
+3. Coherence and Progression: Ensure that events are logically connected and reflect realistic user behavior patterns. Show
+how the user first discovers a domain (emergence) and later supplements their preferences (supplement).
+4. Domains: Each event must correspond to the same domain as in the selected user interactions.
+5. If an event explicitly refers to content from other domains, you need to include those domains in the dependencies, e.g.,
+‘he has asked about setting multiple alarms with different sounds or integrating his **calendar events** to adjust alarm
+times accordingly.‘ Otherwise, simply set it to ‘None‘. The other domains include {other_domains}.
+6. **Every interaction (overall {topic_interactions_number}) in the interaction history needs to be used to generate
+events.**
+## Output F ormat
+The task_id field is composed of the event_index and event_type, for example: event_1_preference_emergence, event_-
+2_preference_supplement.
+Each timeline must start with an event of type preference_emergence, with all subsequent events labeled as supplement,
+and **the event_index should be initialized at 1**.
+Generate the interaction timeline in JSON format
+(**Include {topic_interactions_number} events**, using English):
+Figure 13TIMELINE_GENERATION
+ANSWER_OPTION_PROMPT
+You are an assistant specialized in answering multiple-choice questions.
+## Y our Memory
+{context}
+## User T ask Query
+{question}
+## Options:
+{options}
+Your goal is to choose **the most appropriate answer option for the User Task Query** from the Options based on your
+memory. The output should be **ONLY the option key** without any additional explanation, e.g., ‘A‘, etc.
+Your response:
+Figure 14ANSWER_OPTION_PROMPT
+31
+
+=== PAGE 32 ===
+DIALOGUE_GENERATION
+You are a professional expert in user behavior analysis. Your task is to generate a natural, realistic multi-turn conversation
+between a User and a virtual Assistant that reveals user preferences within the domain specified by {relevant_domains}
+based on the given context.
+**Preference Supplement Moment:**
+This is a conversation where the user may supplement additional information or provide new preferences in the domain of
+{relevant_domains}. The user’s preference may emerge implicitly (through feedback, comparisons, corrections or reactions
+to Assistant suggestions, e.g., "Maybe something lighter would suit me better" instead of directly stating "I prefer X").
+- If the Dependency Domains are not set to None, you also need to take into account the information in User Preferences for
+those domains.
+## User Profile Information
+- User Demographic Profile:{demographic_profile}
+- User Preferences:{preference_str}
+The user must not introduce new preferences or options that are not included in the provided User Preferences. All
+preferences discussed, confirmed, or supplemented by the User within the conversation must strictly adhere to and originate
+from the provided User Preferences.
+## User-Assistant Past Interaction:{message_history}
+Next, you need to generate the conversation for the following task by considering the information comprehensively.
+## T ask Information:
+- Task Description: {task_description}
+- Relevant Domains: {relevant_domains}
+- Task Goal: {task_goal}
+- Dependency Domains: {dependency_domains}
+## Conversation Guidelines:
+1. Generate a realistic multi-turn (5-10 turn) User-Assistant conversation for the above task where the user continues to
+interact with the assistant in the topic of {relevant_domains}.
+2. You must consider the user’s demographic information. If the task requires specific content from the past interactions,
+you must also take into account the past interactions in user’s profile to inform the preference evolution. All dialogue turns
+must be goal-oriented, focusing strictly on task completion.
+3. The assistant in the conversation must identify the user’s preferences and requirements through feedback and inquiry.
+Furthermore, the assistant must diligently and thoroughly complete every user query during interaction until the entire task
+is finalized, ensuring each response is substantial and informative (aiming for 3-5 sentences).
+4. The conversation must integrate and fulfill **all key components and concrete facts specified in the Task Description**!
+(e.g., if the Task Description mentions ’requesting portfolio recommendations tailored to risk tolerance,’ the user’s query
+must contain those specific elements.)
+5. The conversation starts with the user posing a **task-oriented query** and aims to conclude with the **assistant’s
+successful task completion and user satisfaction**.
+6. Summarize the User’s preferences that were discussed, confirmed, or supplemented within the dialogue. **Only include
+preferences that were used by the User during the conversation.**
+## Requirements for Generating the Dialogue:
+1. **User Self-Clarification:** After receiving the assistant’s reply, the user may realize their previous query was not clearly
+expressed and actively clarifies or reformulates it.
+2. **Progressive Interaction:** The user continuously follows up to further specify or narrow down a previous topic, leading
+to a gradual supplement of preferences or requirements.
+3. **Full Task Completion Requirement**: When the user requests a task (e.g., email writing, recommendation, comparison,
+booking assistance, planning, summarization, message crafting, etc.), the assistant MUST provide a real, fully actionable
+output, not just a template or placeholder.
+## Output F ormat:
+‘‘‘json
+{{
+"conversation": "User: [Initial user query about changing needs or dissatisfaction]\nAssistant: [Assistant response]\nUser:
+[User feedback]\nAssistant: [Assistant follow-up helping supplement and complete the task as thoroughly as possible]\n...",
+"preferences": "The user preferences mentioned in the conversation follow the format: domain-preference_name-content,
+e.g., Books-Favourite Authors-Michael Crichton, ..."
+}}
+‘‘‘
+Generate the conversation immediately in the specified JSON format.
+Figure 15DIALOGUE_GENERATION
+32
+
+=== PAGE 33 ===
+USER_FEEDBACK_PROMPT
+You are tasked with generating realistic user responses in a conversation with a personalized assistant.
+**Remember**: In this task, you are not an assistant; you are **the user** seeking help. Maintain this perspective
+throughout the conversation. Here is your profile:
+## Profile:
+- Your Profile Information: {demographic_profile}
+- Your Preferences: {preference_str}
+This is the relevant interaction with the assistant:
+## Past Interaction History:{user_topic_dialog}
+Next, you need to provide feedback based on the assistant’s last reply in the Current Task Interaction by considering the
+following information of the current task comprehensively.
+- Task Description: {task_description}
+- Task Goal: {task_goal}
+- Task Question: {task_question}
+- Current Task Interaction with Assistant: {history}
+Your responses should follow these guidelines:
+1. Be natural and conversational, avoiding artificial or robotic language.
+2. Reflect your profile and preferences provided, and take Past Interaction History into account. Staying consistent with the
+user’s personality throughout the conversation.
+3. Keep each response focused and concise (1-3 sentences maximum)
+4. As soon as BOTH are true:
+- The assistant’s latest reply provides the information you requested, successfully addressing the Task Question and
+achieving the Task Goal.
+- The response also aligns with your stated preferences regarding the task.
+you must output **TERMINATE** immediately. NEVER add new requests if the task is already satisfied.
+5. If the assistant’s latest reply does not meet the above conditions, provide a focused, concise correction or supplement to
+drive the task directly toward completion.
+Your response:
+Figure 16USER_FEEDBACK_PROMPT
+ANSWER_INTERACTION_PROMPT
+You are a conversational AI assistant focused on creating natural, thorough, and personalized interactions to complete the
+user query.
+Below is the memory accumulated from your past interactions with this user
+## Y our Memory
+{context}
+## User T ask Query
+{question}
+## Current T ask Conversation History:{history}
+You need to provide a reply based on the user’s last query in the Current Task Interaction.
+## Guidelines1. Your goal is to provide targeted, complete responses by actively integrating **the user’s preferences
+from your memory**, ensuring the response is tailored and moves the task toward completion.
+2. You need to supplement your answer according to the most recent user feedback in the Conversation History, aiming to
+immediately initiate the task and address the User Task Query as fully as possible.
+3. Do NOT introduce unrelated topics or unnecessary follow-up questions.
+4. Full Task Completion Requirement: When the user requests a task (e.g., email writing, recommendation, comparison,
+booking assistance, planning, summarization, message crafting, etc.), the assistant MUST provide a real, fully actionable
+output, not just a template or placeholder.
+Your response:
+Figure 17ANSWER_INTERACTION_PROMPT
+33
+
+=== PAGE 34 ===
+OPTION_GENERATION_PROMPT
+You are an AI behavior analysis expert. Your task is to produce eight distinct response options that an AI assistant might
+generate for the given user query. Each option (generated response) must be fluent and consistent with the assistant’s tone.
+1.INPUT CONTEXT
+### T ask Information
+- Task Description: {task_description}
+- Task Goal: {task_goal}
+- User Query for the Task: {user_query}
+### Interaction History and Preference
+- Interaction History: {user_topic_dialog}
+- User Long-Term Preference Category: {preferences}
+2.GENERA TION OBJECTIVES
+Generate eight options (A-H) that form a permutation over the following binary dimensions:
+**Task Completion (T):**
+- T=1 (success): The response accurately captures the information sought in the **User Query** and completely satisfies
+the defined **Task Goal**.
+- T=0 (failure): The response appears relevant to the **Task Description** and includes recall-oriented content, but does
+not fully accomplish the task objective.
+**Preference Consistency (P):**
+- P=1 (success): The content of the response consistently aligns with the **user’s long-term preference categories**. These
+types of options require you to carefully read the **Interaction History** and use concrete facts explicitly present in the
+Interaction History to ensure preference consistency.
+- P=0 (failure): The response operates within the correct preference category but introduces inferred, exaggerated, or
+unsupported preference details that are **not grounded in the Interaction History**.
+**Information Confidence (I):**
+- I=1 (success): The task is completed thoroughly and definitively, with no expressions of uncertainty anywhere in the
+response.
+- I=0 (failure): The response completes the task but concludes by expressing uncertainty about the final answer, implying
+that a more satisfactory answer may exist.
+3.RESPONSE OPTION GUIDELINES
+Option (A) [T=1 / P=1 / I=1] — Optimal Resolution
+- Provide a clear response that fully satisfies the task goal. (T=1)
+- Correctly prioritize the user’s long-term preference categories. Ground the response explicitly in **concrete details from
+the Interaction History (facts, constraints, preferences)**. (P=1)
+- Use historical information confidently and efficiently, without uncertainty and additional requests throughout the response.
+(I=1)
+Option (B) [T=1 / P=1 / I=0] — Procedural Overreach and Uncertainty
+- Reach the same correct response as (A). (T=1/P=1)
+- Correctly apply long-term preferences using dialogue-grounded details. (P=1)
+- Express unconfidence and uncertainty stemming from a lack of relevant knowledge. (I=0)
+...
+Option (H) [T=0 / P=0 / I=0] — Systemic Misalignment
+- Fails across task interpretation, preference fidelity, and information confidence. (T=0 / P=0 / I=0)
+- Densely references interaction history without improving relevance.
+4.OUTPUT FORMA T
+User Query for the Task: {user_query}
+Output options must be valid JSON with exactly eight fields: "A" through "H".
+Figure 18OPTION_GENERATION_PROMPT
+34
+
+=== PAGE 35 ===
+EVAL_MEMORY_SCORE
+<instructions>
+Evaluate the assistant’s preference memory using the following criteria:
+1. **Coverage (Recall):**
+- Compare the ‘Assistant Retrieved Memory’ against ‘Preferences to be Mastered’.
+- Does the retrieved memory include all critical preference points?
+- Missing a core preference is a major failure; missing minor details is a minor failure.
+2. **Accuracy & Consistency (Precision):**
+- Is the retrieved information consistent with the specific preference details expressed in the conversation?
+- **Crucial:** Check for hallucinations (invented preferences) or outdated information (preferences that have since changed).
+- Contradictory information without resolution is considered a failure.
+3. **Relevance & Noise:**
+- Raw fragments are acceptable, but the memory should not be overwhelmed by irrelevant noise that obscures the true
+preferences.
+- Memory should be concise, focused, and directly usable to respond to the user query.
+<Scoring Guidelines>
+Score of 1: POOR (Memory Failure / Hallucination)
+- Core preferences are missing entirely.
+- Contains significant incorrect information (hallucinations) or direct contradictions to ‘Preferences to be Mastered’.
+- Retrieval is completely unrelated to the user’s preferences.
+- Excessive repetition of dialogue details obscures key information.
+Score of 2: BASIC (Incomplete / Fragmented)
+- Some relevant preferences retrieved, but key specific details are missing. - Correct information is present but buried under
+excessive noise.
+- May include outdated or imprecise details.
+- Minor redundancy present; core information is partially retrievable.
+Score of 3: STRONG (Accurate but Unrefined)
+- All major preferences are retrieved.
+- No hallucinations or contradictions.
+- May miss subtle implicit nuances or contain slightly cluttered raw chunks, but overall core truth is intact.
+- Information is comprehensive and relevant, though not fully polished.
+Score of 4: EXCEPTIONAL (Perfect Recall)
+- All ‘Preferences to be Mastered’ are identified and retrieved.
+- Memory is precise, accurate, and entirely relevant to the context.
+- Clear and concise presentation; fully supports the user query.
+- Information is complete, distilled, and polished for usability.
+<response_format>
+Memory Score: [1-4]
+Key Observations:
+- **Coverage Check:** [List which preferences from ’Mastered’ were retrieved vs. missing]
+- **Accuracy Check:** [Note any hallucinations, contradictions, or outdated info]
+- **Format / Noise:** [Comment briefly if format or noise affected clarity, though coverage is the priority]
+- **Information Quality:** Memory should avoid excessive repetition and should condense dialogue information relevant to
+the query.
+</response_format>
+Insert data below for evaluation:
+<conversation>{conversation}</conversation>
+<preferences_to_be_mastered>{preferences_to_be_mastered}</preferences_to_be_mastered>
+<user_query>{query}</user_query>
+Next, you need to evaluate the "assistant_retrieved_memory" according to the given context and the guidelines mentioned
+above.
+<assistant_retrieved_memory>{assistant_retrieved_memory}</assistant_retrieved_memory>
+<response>Provide your evaluation enclosed within <response></response> tags following the response format
+above.</response>
+Figure 19EVAL_MEMORY_SCORE
+35
+
+=== PAGE 36 ===
+T able 11Comparison of retrieval memory context among baselines in the single-domain setting.
+Baseline Domain: Hotel Query: Can you help me find a hotel in Rome, Italy? I’m looking for some good
+options for my stay.
+RAG User: Hi there! I’m planning a trip to Italy and would love some help crafting an itinerary that
+immerses me in the country’s rich art and history. I’m particularly interested in unique cultural
+activities like cooking classes and visiting lesser-known towns. Could you assist me with that?
+Assistant: Absolutely, I can help with that. Are there any specific hotel chains you prefer, or do
+you have a preferred location or star rating in mind for your stay abroad?
+User: I prefer Radisson, Hyatt, or Intercontinental hotels. I’m looking for something in the city
+center or near cultural landmarks, ideally a 4 or 5-star rating.
+Assistant: Great choices! Let me search for available options that match your preferences. I’ll focus
+on Radisson, Hyatt, and Intercontinental hotels located in city centers or near cultural landmarks,
+offering the amenities you mentioned. Would you like information on room types as well?
+User: Yes, please. I’m considering either a double room or a suite...following 957 tokens.
+LightMem 2023-08-27T15:00:00.000 Sun User is planning a trip abroad and needs help finding a hotel.2023-08-
+27T15:00:00.000 Sun User is looking for hotels in the city center or near cultural landmarks.2023-09-
+23T15:00:00.000 Sat User is interested in hotels in the city center near cultural sites with amenities
+such as WiFi, free breakfast, and a pool.2023-09-24T15:00:00.000 Sun User is planning a trip
+to Italy.2023-09-22T06:00:00.000 Fri User is looking for a luxurious hotel near the Sultanahmet
+district and Hagia Sophia.2023-09-23T15:00:00.000 Sat User is planning a trip and is looking for
+unique boutique hotels with rich cultural heritage.2023-09-21T19:00:00.000 Thu User is interested
+in hotels within walking distance of Bauhaus architecture and the city’s nightlife scene.2023-
+08-27T15:00:00.000 Sun User wants to focus on hotel amenities like complimentary WiFi, free
+breakfast, pool, gym facilities, and an on-site bar or lounge area.2023-09-24T15:00:00.000 Sun User
+is interested in immersing themselves in Italy’s rich art and history. 2023-07-29T06:00:00.000 Sat
+User is considering hotels like Radisson or Hyatt.
+MemOS User[2023-07-29T06:00:00]: Oh, I should have mentioned, I’m interested in staying close to the city
+center or near cultural landmarks. Also, amenities like WiFi, free breakfast, and a pool would be
+great. Assistant[2023-07-29T06:00:00]: Got it! Let me narrow down some options for you. Based on
+your preferences, I found a few 4 and 5-star hotels in the city center and near cultural attractions.
+Both Radisson and Hyatt offer free WiFi, breakfast, and have pools. Would you like me to check
+availability or provide more details on these options? User[2023-08-27T15:00:00]: Yes, please. I’m
+considering either a double room or a suite, as I’m traveling with my spouse...following 890
+tokens.
+Explicit Preference: 1. The user is looking for unique boutique hotels or properties with rich
+cultural heritage that offer an exceptional experience with comfort, convenience, and an authentic
+sense of place. 2. The user is interested in hotels located in the city center or near cultural sites
+and values amenities such as WiFi, free breakfast, and a pool. User prefers Radisson, Hyatt, or
+Intercontinental hotels with amenities like a rooftop pool, complimentary WiFi, free breakfast, and
+gym facilities. They are considering either a double room or a suite. The user prefers hotels within
+walking distance of Bauhaus architecture and the city’s nightlife scene in Tel Aviv, specifically
+from the Radisson, Hyatt, and Intercontinental chains. They want a hotel with amenities like
+complimentary WiFi, free breakfast, a pool, gym facilities, and an on-site bar or lounge area,
+preferring Radisson, Hyatt, or Intercontinental hotels with a 4 or 5-star rating.
+Implicit Preference:1. Preference for hotels with reputable brands. 2. Preference for accommo-
+dations that offer unique cultural experiences.3. Preference for personalized and immersive travel
+experiences that offer a combination of historical exploration, local culture, scenic beauty, and
+attending festivals related to hobbies or unique experiences...following 200 tokens.
+Supermemory User needs help finding a hotel. User is looking for a hotel near Hagia Sophia in Istanbul. User is
+looking for a luxurious hotel in Istanbul. User is looking for a hotel near Sultanahmet district in
+Istanbul. User is planning a trip to Italy. User wants off-the-beaten-path experiences for Italy trip.
+User wants help crafting an itinerary for Italy trip. User is interested in unique cultural activities
+for Italy trip. User wants hotels near the city’s nightlife scene. User wants Italy trip to immerse in
+art and history.
+36
+
+=== PAGE 37 ===
+T able 12Comparison of retrieval memory context among baselines in the single-domain setting.
+Baseline Domain: Hotel Query: Can you help me find a hotel in Rome, Italy? I’m looking for some good
+options for my stay.
+Memobase —# Memory Unless the user has relevant queries, do not actively mention those memories in
+the conversation.## User Current Profile:- event::rav_kav_application: User is applying for a
+Rav-Kav card. [mention 2023-10-22]- interest::travel: User is a frequent traveler; they are looking for
+experiences that are off-the-beaten-path, particularly in lesser-known towns; they are considering
+visiting Santorini and Delphi, exploring ancient ruins, and experiencing local cuisine and culture; User
+is interested in sustainable tourism practices, including eco-friendly accommodations and activities.
+[mention 2023-10-22, 2023-10-07]- event::pricing_inquiries: User is interested in the pricing and
+additional services for the trip, including potential discounts for frequent travelers; they requested
+help with understanding how to get a Rav-Kav card and the discounts it offers. [mention 2023-10-
+22]- event::bus_travel_enhancement: User is interested in enhancing their bus travel experience,
+particularly regarding entertainment options available on Egged and Dan buses. [mention 2023-10-22]-
+event::bus_preferences: User is interested in both Egged and Dan buses for their trips between Tel
+Aviv and Jerusalem [mention 2023-10-22]- schedule::notifications: User enabled real-time updates for
+their bus trip to be notified of any schedule changes or delays...following 746 tokens.
+Mem0 ‘2023-09-21T15:00:00-07:00: User is planning a trip to Istanbul and is looking for a luxurious hotel
+near the Sultanahmet district and Hagia Sophia’, ‘2023-09-23T00:00:00-07:00: User wants hotel
+recommendations located in the city center or near cultural sites with WiFi, free breakfast, and a
+pool’, "2023-09-24T00:00:00-07:00: User wants an itinerary that immerses in Italy’s art and history",
+‘2023-10-14T04:00:00-07:00: User is planning a multi-city trip to Europe including Amsterdam,
+Berlin, and Prague’, ‘2023-09-21T15:00:00-07:00: User requests a curated list of Radisson, and
+Intercontinental hotels in Tel Aviv, focusing on room rates for suites at Radisson Blu Pera, amenities,
+and proximity to Bauhaus architecture and nightlife’, ‘2023-08-27T00:00:00-07:00: User is planning a
+trip abroad and wants assistance finding a hotel with complimentary WiFi, free breakfast, a pool,
+gym facilities, and an on-site bar or lounge area’, ‘2023-08-27T00:00:00-07:00: User wants to book
+a suite at Hyatt near cultural landmarks with amenities’, ‘2023-09-24T00:00:00-07:00: User wants
+information about events or festivals during the fall in Lucca and Umbria’, ‘2023-09-21T15:00:00-07:00:
+User wants to book the suite at Radisson Blu Pera, which has a rooftop pool and central location.’
+EverMemOS On August 27, 2023 (Sunday) at 12:00 AM UTC, the user initiated a conversation requesting
+assistance to find a hotel for an upcoming trip abroad. The user specified a preference for hotels
+offering amenities such as complimentary WiFi, free breakfast, a pool, gym facilities, and an on-
+site bar or lounge area. The assistant responded promptly, asking if the user had any preferred
+hotel chains, locations, or star ratings. The user indicated a preference for Radisson, Hyatt, or
+Intercontinental hotels, ideally located in city centers or near cultural landmarks, with a 4 or 5-star
+rating. The assistant acknowledged these preferences and offered to search for suitable options,
+also inquiring if the user wanted information on room types. The user confirmed interest in either
+a double room or a suite, mentioning travel with a spouse. By 12:02:30 AM UTC, the assistant
+presented several options meeting the criteria: a 5-star Radisson hotel in the city center and a 4-star
+Hyatt hotel near cultural landmarks, both offering the requested amenities and room types. The
+user expressed a preference for the suite at the Hyatt near cultural landmarks, highlighting the
+appeal of the amenities. The assistant confirmed the booking of the suite at the Hyatt and assured
+the user that a confirmation including check-in times and amenity details would be sent shortly.
+Throughout the conversation, the assistant maintained a helpful and accommodating tone, and the
+user demonstrated clear decision-making and satisfaction with the options provided. The entire
+interaction took place within approximately four minutes, starting at 12:00 AM UTC on August
+27, 2023.The conversation began on September 24, 2023 (Sunday) at 12:00 AM UTC with the user
+initiating a request for travel planning assistance. The user expressed a desire to plan a trip to Italy
+focused on immersing themselves in the country’s rich art and history. They specifically requested
+help in crafting an itinerary that included unique cultural activities such as cooking classes and visits
+to lesser-known towns. This indicated the user’s interest in an authentic and culturally rich travel
+experience beyond typical tourist destinations. Prior to this, ...following 2632 tokens.
+37
+
+=== PAGE 38 ===
+Figure 20Detailed annotation in Label Studio for data quality assessment. The protocol evaluates 6 criteria, ranging
+from preference consistency to linguistic naturalness.
+38

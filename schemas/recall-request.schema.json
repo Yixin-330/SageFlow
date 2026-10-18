@@ -1,0 +1,21 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://sageflow.local/schemas/recall-request.schema.json",
+  "title": "RecallRequest",
+  "type": "object",
+  "required": ["user_id", "purpose"],
+  "properties": {
+    "user_id": {"type": "string"},
+    "trace_id": {"type": "string"},
+    "purpose": {"enum": ["conversation", "state_inference", "decision"]},
+    "query_text": {"type": "string"},
+    "predicates": {"type": "array", "items": {"type": "string"}},
+    "required_memory_ids": {"type": "array", "items": {"type": "string"}},
+    "current_state": {"type": "object"},
+    "trip_id": {"type": "string"},
+    "topics": {"type": "array", "items": {"type": "string"}},
+    "permissions": {"type": "array", "items": {"type": "string"}},
+    "limit": {"type": "integer", "minimum": 1, "maximum": 50},
+    "situation": {"type": "object"}
+  }
+}

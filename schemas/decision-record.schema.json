@@ -1,0 +1,22 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://sageflow.local/schemas/decision-record.schema.json",
+  "title": "DecisionRecord",
+  "type": "object",
+  "required": ["decision_id", "trigger_event_id", "state_id", "candidate_action_ids", "selected_action_id", "selected_score", "policy_filters_applied", "decision_reason", "policy_version", "trace_id", "recall_trace_id", "matched_rule_ids"],
+  "properties": {
+    "decision_id": {"type": "string"},
+    "trigger_event_id": {"type": "string"},
+    "state_id": {"type": ["string", "null"]},
+    "candidate_action_ids": {"type": "array", "items": {"type": "string"}},
+    "selected_action_id": {"type": "string"},
+    "selected_score": {"type": "number"},
+    "policy_filters_applied": {"type": "array", "items": {"type": "string"}},
+    "decision_reason": {"type": "string"},
+    "policy_version": {"type": "string"},
+    "trace_id": {"type": "string"},
+    "recall_trace_id": {"type": ["string", "null"]},
+    "matched_rule_ids": {"type": "array", "items": {"type": "string"}}
+  },
+  "additionalProperties": true
+}

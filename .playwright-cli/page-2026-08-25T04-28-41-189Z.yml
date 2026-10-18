@@ -1,0 +1,250 @@
+- generic [ref=f2e2]:
+  - banner [ref=f2e692]:
+    - link "SageFlow 首页" [ref=f2e693] [cursor=pointer]:
+      - /url: /prototype/
+      - generic [ref=f2e694]: S
+      - generic [ref=f2e695]:
+        - generic [ref=f2e696]: SageFlow
+        - generic [ref=f2e697]: 长期关系智能原型
+    - navigation "原型区域" [ref=f2e698]:
+      - generic [ref=f2e699]: 情境模拟器
+      - generic [ref=f2e700]: Traveler App
+      - generic [ref=f2e701]: 评测
+    - generic [ref=f2e702]: PROTOTYPE · 模拟数据
+  - main [ref=f2e704]:
+    - generic [ref=f2e705]:
+      - generic [ref=f2e706]:
+        - text: EVALUATION MATRIX · VARIANT C
+        - heading "每一个能力，都要有同期证据" [level=1] [ref=f2e707]
+        - paragraph [ref=f2e708]: 把模式差异、协议门禁和失败轨迹放在同一张工作台上。
+      - generic [ref=f2e709]:
+        - combobox [ref=f2e710] [cursor=pointer]:
+          - option "S01 · 雨势逼近，体力接近上限"
+          - option "S02 · 长期偏好遇到今天的明确意图"
+          - option "S03 · 有疲劳迹象，但证据不足"
+          - option "S04 · 连续忽略后的克制" [selected]
+          - option "S05 · 亲子同行的休息窗口"
+          - option "S06 · 高匹配推荐超出预算"
+          - option "S07 · 两条节奏记忆发生冲突"
+          - option "S08 · 延迟到达的过期天气"
+        - button "运行当前场景" [ref=f2e711] [cursor=pointer]
+        - button "重置" [ref=f2e712] [cursor=pointer]
+    - generic [ref=f2e713]:
+      - generic [ref=f2e714]:
+        - generic [ref=f2e715]:
+          - text: 同步评测
+          - generic [ref=f2e716]: 确定性模拟回归
+        - generic [ref=f2e717]: 8/8 场景通过
+      - generic [ref=f2e719]:
+        - generic [ref=f2e720]:
+          - text: 数据协议
+          - generic [ref=f2e721]: 8/8
+        - generic [ref=f2e724]:
+          - text: 记忆召回
+          - generic [ref=f2e725]: 8/8
+        - generic [ref=f2e728]:
+          - text: 状态模型
+          - generic [ref=f2e729]: 8/8
+        - generic [ref=f2e732]:
+          - text: 主动决策
+          - generic [ref=f2e733]: 8/8
+        - generic [ref=f2e736]:
+          - text: 反馈闭环
+          - generic [ref=f2e737]: 8/8
+      - paragraph [ref=f2e740]: 这些结果验证协议与金标断言是否一致，不代表真实模型准确率或真实用户效果。
+    - generic [ref=f2e741]:
+      - generic [ref=f2e742]:
+        - generic [ref=f2e743]:
+          - generic [ref=f2e744]: S04 · 连续忽略后的克制
+          - generic [ref=f2e745]: 天气有变化但紧迫性不高，用户已连续忽略两次低价值提醒。
+        - table [ref=f2e746]:
+          - rowgroup [ref=f2e747]:
+            - row [ref=f2e748]:
+              - columnheader "比较维度" [ref=f2e749]
+              - columnheader "Baseline" [ref=f2e750]
+              - columnheader "Memory" [ref=f2e751]
+              - columnheader "SageFlow" [ref=f2e752]
+          - rowgroup [ref=f2e753]:
+            - row [ref=f2e754]:
+              - rowheader "可见信息" [ref=f2e755]
+              - cell "当前事实" [ref=f2e756]
+              - cell "事实 + 记忆" [ref=f2e757]
+              - cell "事实 + 记忆 + 状态" [ref=f2e758]
+            - row [ref=f2e759]:
+              - rowheader "召回记忆" [ref=f2e760]
+              - cell "—" [ref=f2e761]
+              - cell "2 条" [ref=f2e762]
+              - cell "2 条" [ref=f2e763]
+            - row [ref=f2e764]:
+              - rowheader "状态维度" [ref=f2e765]
+              - cell "—" [ref=f2e766]
+              - cell "—" [ref=f2e767]
+              - cell "2 项" [ref=f2e768]
+            - row [ref=f2e769]:
+              - rowheader "最终选择" [ref=f2e770]
+              - cell "天气提醒" [ref=f2e771]
+              - cell "兴趣推荐" [ref=f2e772]
+              - cell "保持静默" [ref=f2e773]
+            - row [ref=f2e774]:
+              - rowheader "打扰成本" [ref=f2e775]
+              - cell "42%" [ref=f2e776]
+              - cell "45%" [ref=f2e777]
+              - cell "0%" [ref=f2e778]
+            - row [ref=f2e779]:
+              - rowheader "决策净分" [ref=f2e780]
+              - cell "0.06" [ref=f2e781]
+              - cell "0.16" [ref=f2e782]
+              - cell "0.52" [ref=f2e783]
+      - generic [ref=f2e784]:
+        - generic [ref=f2e785]:
+          - generic [ref=f2e786]: SageFlow 决策
+          - generic [ref=f2e787]: 保持静默
+        - blockquote [ref=f2e788]: 保持静默：用户连续忽略了低紧迫建议，当前变化不足以再次介入。
+        - generic [ref=f2e789]:
+          - generic [ref=f2e790]:
+            - text: 用户价值
+            - emphasis [ref=f2e793]: 52%
+          - generic [ref=f2e794]:
+            - text: 打扰成本
+            - emphasis [ref=f2e796]: 0%
+          - generic [ref=f2e797]:
+            - text: 风险
+            - emphasis [ref=f2e799]: 0%
+        - paragraph [ref=f2e800]: 频率约束使静默的净价值最高。
+    - generic [ref=f2e801]:
+      - generic [ref=f2e802]:
+        - generic [ref=f2e803]: 8 个确定性场景回归
+        - generic [ref=f2e804]: 点击场景切换当前情境
+      - generic [ref=f2e805]:
+        - generic [ref=f2e806]:
+          - generic [ref=f2e807]: 场景
+          - generic [ref=f2e808]: 协议
+          - generic [ref=f2e809]: 记忆
+          - generic [ref=f2e810]: 状态
+          - generic [ref=f2e811]: 决策
+          - generic [ref=f2e812]: 反馈
+          - generic [ref=f2e813]: 结果
+        - generic [ref=f2e814] [cursor=pointer]:
+          - generic [ref=f2e815]:
+            - generic [ref=f2e816]: S01
+            - text: 雨势逼近，体力接近上限
+          - generic [ref=f2e817]: ✓
+          - generic [ref=f2e818]: ✓
+          - generic [ref=f2e819]: ✓
+          - generic [ref=f2e820]: ✓
+          - generic [ref=f2e821]: ✓
+          - generic [ref=f2e822]: 通过
+        - generic [ref=f2e823] [cursor=pointer]:
+          - generic [ref=f2e824]:
+            - generic [ref=f2e825]: S02
+            - text: 长期偏好遇到今天的明确意图
+          - generic [ref=f2e826]: ✓
+          - generic [ref=f2e827]: ✓
+          - generic [ref=f2e828]: ✓
+          - generic [ref=f2e829]: ✓
+          - generic [ref=f2e830]: ✓
+          - generic [ref=f2e831]: 通过
+        - generic [ref=f2e832] [cursor=pointer]:
+          - generic [ref=f2e833]:
+            - generic [ref=f2e834]: S03
+            - text: 有疲劳迹象，但证据不足
+          - generic [ref=f2e835]: ✓
+          - generic [ref=f2e836]: ✓
+          - generic [ref=f2e837]: ✓
+          - generic [ref=f2e838]: ✓
+          - generic [ref=f2e839]: ✓
+          - generic [ref=f2e840]: 通过
+        - generic [ref=f2e841] [cursor=pointer]:
+          - generic [ref=f2e842]:
+            - generic [ref=f2e843]: S04
+            - text: 连续忽略后的克制
+          - generic [ref=f2e844]: ✓
+          - generic [ref=f2e845]: ✓
+          - generic [ref=f2e846]: ✓
+          - generic [ref=f2e847]: ✓
+          - generic [ref=f2e848]: ✓
+          - generic [ref=f2e849]: 通过
+        - generic [ref=f2e850] [cursor=pointer]:
+          - generic [ref=f2e851]:
+            - generic [ref=f2e852]: S05
+            - text: 亲子同行的休息窗口
+          - generic [ref=f2e853]: ✓
+          - generic [ref=f2e854]: ✓
+          - generic [ref=f2e855]: ✓
+          - generic [ref=f2e856]: ✓
+          - generic [ref=f2e857]: ✓
+          - generic [ref=f2e858]: 通过
+        - generic [ref=f2e859] [cursor=pointer]:
+          - generic [ref=f2e860]:
+            - generic [ref=f2e861]: S06
+            - text: 高匹配推荐超出预算
+          - generic [ref=f2e862]: ✓
+          - generic [ref=f2e863]: ✓
+          - generic [ref=f2e864]: ✓
+          - generic [ref=f2e865]: ✓
+          - generic [ref=f2e866]: ✓
+          - generic [ref=f2e867]: 通过
+        - generic [ref=f2e868] [cursor=pointer]:
+          - generic [ref=f2e869]:
+            - generic [ref=f2e870]: S07
+            - text: 两条节奏记忆发生冲突
+          - generic [ref=f2e871]: ✓
+          - generic [ref=f2e872]: ✓
+          - generic [ref=f2e873]: ✓
+          - generic [ref=f2e874]: ✓
+          - generic [ref=f2e875]: ✓
+          - generic [ref=f2e876]: 通过
+        - generic [ref=f2e877] [cursor=pointer]:
+          - generic [ref=f2e878]:
+            - generic [ref=f2e879]: S08
+            - text: 延迟到达的过期天气
+          - generic [ref=f2e880]: ✓
+          - generic [ref=f2e881]: ✓
+          - generic [ref=f2e882]: ✓
+          - generic [ref=f2e883]: ✓
+          - generic [ref=f2e884]: ✓
+          - generic [ref=f2e885]: 通过
+    - generic [ref=f2e886]:
+      - generic [ref=f2e887]:
+        - generic [ref=f2e888]: 事件轨迹
+        - list [ref=f2e890]:
+          - listitem [ref=f2e891]:
+            - time [ref=f2e893]: 15:00
+            - generic [ref=f2e894]:
+              - generic [ref=f2e895]: 载入旅行情境
+              - generic [ref=f2e896]: 北山街 · 小雨
+          - listitem [ref=f2e897]:
+            - time [ref=f2e899]: 15:05
+            - generic [ref=f2e900]:
+              - generic [ref=f2e901]: 用户连续第二次忽略低价值建议
+              - generic [ref=f2e902]: feedback.action_ignored
+      - generic [ref=f2e903]:
+        - generic [ref=f2e904]: 状态证据
+        - generic [ref=f2e906]:
+          - generic [ref=f2e907]:
+            - generic [ref=f2e908]: 疲劳
+            - generic [ref=f2e909]: low
+            - emphasis [ref=f2e910]: 69%
+            - generic [ref=f2e911]: current_step_count
+          - generic [ref=f2e912]:
+            - generic [ref=f2e913]: 打扰容忍
+            - generic [ref=f2e914]: low
+            - emphasis [ref=f2e915]: 86%
+            - generic [ref=f2e916]: S04_evt_ignore
+      - generic [ref=f2e917]:
+        - generic [ref=f2e918]: 候选行动
+        - generic [ref=f2e920]:
+          - generic [ref=f2e921]:
+            - generic [ref=f2e922]: 保持静默
+            - generic [ref=f2e923]: "0.52"
+            - generic [ref=f2e924]: RECENTLY_IGNORED · LOW_URGENCY
+          - generic [ref=f2e925]:
+            - generic [ref=f2e926]: 询问确认
+            - generic [ref=f2e927]: "0.38"
+            - generic [ref=f2e928]: UNCERTAINTY_REQUIRES_CONFIRMATION
+  - navigation "原型变体切换" [ref=f2e929]:
+    - button "上一个变体" [ref=f2e930] [cursor=pointer]: ←
+    - generic [ref=f2e931]:
+      - generic [ref=f2e932]: 界面原型
+      - generic [ref=f2e933]: C · 对照评测矩阵
+    - button "下一个变体" [ref=f2e934] [cursor=pointer]: →

@@ -1,0 +1,22 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://sageflow.local/schemas/recall-bundle.schema.json",
+  "title": "RecallBundle",
+  "type": "object",
+  "required": ["trace_id", "purpose", "memories", "mandatory_evidence", "ranked_memories", "matched_rules", "current_state", "conflicts", "relations", "omitted", "trace", "policy_version", "architecture"],
+  "properties": {
+    "trace_id": {"type": "string"},
+    "purpose": {"enum": ["conversation", "state_inference", "decision"]},
+    "memories": {"type": "array"},
+    "mandatory_evidence": {"type": "array"},
+    "ranked_memories": {"type": "array"},
+    "matched_rules": {"type": "array"},
+    "current_state": {"type": ["object", "null"]},
+    "conflicts": {"type": "array"},
+    "relations": {"type": "array"},
+    "omitted": {"type": "array"},
+    "trace": {"type": "object", "required": ["plan", "selected_memory_ids", "mandatory_memory_ids", "elapsed_ms"]},
+    "policy_version": {"type": "string"},
+    "architecture": {"enum": ["flat", "typed", "hybrid"]}
+  }
+}

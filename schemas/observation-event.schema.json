@@ -1,0 +1,20 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://sageflow.local/schemas/observation-event.schema.json",
+  "title": "ObservationEvent",
+  "type": "object",
+  "required": ["schema_version", "event_id", "event_type", "user_id", "trip_id", "occurred_at", "recorded_at", "source", "payload", "trace_id"],
+  "properties": {
+    "schema_version": {"const": "1.0"},
+    "event_id": {"type": "string", "minLength": 1},
+    "event_type": {"type": "string", "minLength": 1},
+    "user_id": {"type": "string"},
+    "trip_id": {"type": "string"},
+    "occurred_at": {"type": "string", "format": "date-time"},
+    "recorded_at": {"type": "string", "format": "date-time"},
+    "source": {"type": "object", "required": ["type"]},
+    "payload": {"type": "object"},
+    "trace_id": {"type": "string"}
+  },
+  "additionalProperties": true
+}
