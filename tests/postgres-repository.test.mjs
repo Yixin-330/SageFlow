@@ -99,3 +99,29 @@ test("Postgres retrieval channels receive tenant and prefiltered memory IDs", as
   assert.deepEqual(vectorQuery.params.slice(0, 4), ["usr_a", "[0.5,0.5]", "test-v1", ["mem_allowed"]]);
   assert.match(vectorQuery.text, /model_version = \$3/);
 });
+
+test("Postgres forgetting purges dependent artifacts inside one tenant transaction", async () => {
+  const pool = fakePool();
+  await createPostgresMemoryRepository(pool).withTransaction((repository) =>
+    repository.forgetArtifacts("usr_a", ["mem_a"], ["evt_a"], "2026-10-22T00:00:00Z"));
+  const deletes = pool.statements.filter((item) => item.text.startsWith("DELETE FROM"));
+  assert.ok(deletes.some((item) => item.text.startsWith("DELETE FROM memory_items")));
+  assert.ok(deletes.some((item) => item.text.startsWith("DELETE FROM observation_events")));
+  assert.ok(deletes.some((item) => item.text.startsWith("DELETE FROM memory_recall_logs")));
+  assert.ok(deletes.every((item) => item.params[0] === "usr_a"));
+  assert.ok(pool.statements.some((item) => item.text.startsWith("INSERT INTO memory_tombstones")));
+  assert.equal(pool.statements.at(-1).text, "COMMIT");
+});
+
+test("promotion groups use a tenant-scoped lock and durable upsert", async () => {
+  const pool = fakePool();
+  await createPostgresMemoryRepository(pool).withTransaction(async (repository) => {
+    await repository.lockPromotionGroup("usr_a", "pg_one");
+    await repository.upsertPromotionGroup({ user_id: "usr_a", group_id: "pg_one", status: "collecting",
+      observation_deadline_at: "2026-12-01T00:00:00Z" });
+  });
+  const lock = pool.statements.find((item) => item.text.includes("pg_advisory_xact_lock"));
+  const write = pool.statements.find((item) => item.text.startsWith("INSERT INTO memory_promotion_groups"));
+  assert.deepEqual(lock.params, ["usr_a", "pg_one"]);
+  assert.deepEqual(write.params.slice(0, 4), ["usr_a", "pg_one", "collecting", "2026-12-01T00:00:00Z"]);
+});

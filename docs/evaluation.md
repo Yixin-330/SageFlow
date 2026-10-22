@@ -1,8 +1,10 @@
-# 阶段 0–6 同期评测
+# 阶段 0–7 同期评测
 
 第一阶段成绩只表示模拟数据上的确定性回归，不代表真实用户、真实模型或外部接口表现。
 
-记忆专项包含 [`evaluation/memory-cases.json`](../evaluation/memory-cases.json) 的 8 条 Memory Engine 接口回归，以及 [`evaluation/human-memory-review.jsonl`](../evaluation/human-memory-review.jsonl) 的人工语义评测队列。自动通过不替代人工金标。
+记忆专项包含 [`evaluation/memory-cases.json`](../evaluation/memory-cases.json) 的 8 条 Memory Engine 接口回归，以及 [`evaluation/human-memory-review-v2.jsonl`](../evaluation/human-memory-review-v2.jsonl) 的人工语义评测队列。原始人工标注保留在旧文件中，不作为默认可运行队列。自动通过不替代人工金标。
+
+三层召回新增回归：普通短期观察不进入 mandatory、明确行程承诺与硬约束进入 mandatory、长期/本次行程/State 在 DecisionContext 中分层可追溯，以及必须证据溢出时保持静默。相关用例位于 [`tests/hybrid-recall.test.mjs`](../tests/hybrid-recall.test.mjs) 与 [`tests/decision-cycle.test.mjs`](../tests/decision-cycle.test.mjs)；这仍是确定性回归，不代表真实用户的召回准确率。
 
 | 模块 | 自动断言 | 第一阶段门禁 |
 |---|---|---|
@@ -16,10 +18,16 @@
 | PostgreSQL 持久化 | 事务、迁移校验、重载召回、租户隔离 | 部分写入为 0；跨用户泄漏为 0 |
 | 混合召回 | Recall@K、Precision@K、Hit@1、MRR、nDCG、必须证据遗漏、禁入记忆泄漏、冲突覆盖 | 模拟集上必须证据遗漏与禁入泄漏为 0；冲突覆盖 100% |
 | 召回驱动闭环 | 8 个场景的状态/行动/静默、Recall Trace 关联、拒绝反馈安全、移除/增加记忆的反事实 | 模拟场景 8/8；反事实 2/2；证据关联与反馈安全 100% |
+| 评测与可观测性 | 证据 ID 可解析性、困难反事实、双人独立人工标注、一键原型门禁 | 8 条困难场景通过；状态证据审计 100%；人工结果未标注时不得声称已验证 |
 
 可用 `npm run evaluate:memory` 独立运行记忆回归；`npm test` 还覆盖架构模式、路由、Pending、状态隔离、关系边与版本谱系。
 可用 `npm run evaluate:recall` 比较 `flat` / `typed` / `hybrid` 的同一组固定检索样例。该样例集很小，指标只用于回归，不能当作真实用户召回率或统计显著的模式优劣结论。
 可用 `npm run evaluate:cycle` 运行阶段六端到端回放；页面评测面板也显示该闭环报告。
+可用 `npm run evaluate:stage7` 汇总当前原型门禁。它会同时报告试点阻塞项；原型通过不代表真实用户试点就绪。
+
+生命周期评测现可由 `evaluateMemoryLifecycle` 接收记忆、召回日志、冲突、Pending、mutation 与人工标签，计算过期短期记忆误召回率、冲突误报率与平均关闭时长、Pending 晋升/过期率、误晋升率和置信度 Brier 分数。未提供分母或人工标签的指标返回 `null`（未测量），绝不算作零错误。阶段七报告保留 `LIFECYCLE_LABELS_NOT_MEASURED` 试点阻塞项；当前没有真实晋升标注，不能声称晋升准确率已验证。
+
+晋升机制第 0–5 步的独立门禁见[晋升评测说明](promotion-evaluation.md)。`npm run evaluate:promotion` 基于模拟金标报告误晋升、漏晋升、Pending 过期、平均停留、晋升后纠正/冲突、幂等、来源和 scope 指标。模拟指标不能代替双人独立人工 scope 评审或真实用户测量。
 
 ## 阶段门禁
 
@@ -30,6 +38,7 @@
 - 阶段 4：一次 Observe 原子提交；同 ID 的不同用户互不覆盖；重建 Engine 后仍可召回；迁移不可被静默篡改。
 - 阶段 5：所有通道先通过用户、权限、有效期与范围过滤；必须证据不能被 Top-K 截断；召回保留通道排名与排除原因。上线前需扩大人工标注集，并用真实数据库测 P95 时延。
 - 阶段 6：决策通过 Recall Bundle 读取记忆，不依赖固定记忆 ID；决策保留召回追踪 ID；移除预算记忆或加入匹配服务规则应产生可解释的行动差异。
+- 阶段 7：状态证据必须能解析到当前事件或本次召回记忆；权限、过期信息、预算、冲突、亲子与敏感信息须通过困难反事实；真实人工标注缺失时显式保持待评审。
 
 ## 三类判定
 

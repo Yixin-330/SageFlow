@@ -9,7 +9,12 @@
     "evaluate:memory": "node scripts/evaluate-memory.mjs",
     "evaluate:recall": "node scripts/evaluate-recall.mjs",
     "evaluate:cycle": "node scripts/evaluate-cycle.mjs",
+    "evaluate:human": "node scripts/evaluate-human.mjs",
+    "evaluate:stress": "node scripts/evaluate-stress.mjs",
+    "evaluate:stage7": "node scripts/evaluate-stage-seven.mjs",
+    "evaluate:promotion": "node scripts/evaluate-promotion.mjs",
     "migrate:postgres": "node scripts/migrate-postgres.mjs",
+    "expire:promotion": "node scripts/expire-promotion-groups.mjs",
     "test:postgres": "node --test tests/postgres-integration.test.mjs"
   },
   "dependencies": {

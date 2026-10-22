@@ -1,0 +1,31 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://sageflow.local/schemas/promotion-group.schema.json",
+  "title": "PromotionGroup",
+  "type": "object",
+  "required": ["group_id", "user_id", "claim", "memory_domain", "memory_kind", "scope_anchor", "status", "generation", "policy_version", "first_seen_at", "observation_deadline_at", "evidence", "evidence_event_ids", "candidate_ids", "pending_ids", "source_memory_ids", "trip_ids", "session_ids", "counter_evidence", "history"],
+  "properties": {
+    "group_id": {"type": "string"},
+    "user_id": {"type": "string"},
+    "claim": {"type": "object", "required": ["subject", "predicate", "value"]},
+    "memory_domain": {"enum": ["user", "relational", "shared"]},
+    "memory_kind": {"enum": ["episodic", "semantic", "procedural"]},
+    "scope_anchor": {"type": "object"},
+    "status": {"enum": ["collecting", "eligible", "needs_confirmation", "blocked_by_counter_evidence", "promoted", "expired", "rejected_by_policy"]},
+    "generation": {"type": "integer", "minimum": 1},
+    "policy_version": {"type": "string"},
+    "first_seen_at": {"type": "string", "format": "date-time"},
+    "last_seen_at": {"type": "string", "format": "date-time"},
+    "observation_deadline_at": {"type": "string", "format": "date-time"},
+    "evidence": {"type": "array"},
+    "evidence_event_ids": {"type": "array", "items": {"type": "string"}},
+    "candidate_ids": {"type": "array", "items": {"type": "string"}},
+    "pending_ids": {"type": "array", "items": {"type": "string"}},
+    "source_memory_ids": {"type": "array", "items": {"type": "string"}},
+    "trip_ids": {"type": "array", "items": {"type": "string"}},
+    "session_ids": {"type": "array", "items": {"type": "string"}},
+    "counter_evidence": {"type": "array"},
+    "last_evaluated_at": {"type": ["string", "null"], "format": "date-time"},
+    "history": {"type": "array"}
+  }
+}

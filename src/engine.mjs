@@ -18,9 +18,22 @@ function merge(target, patch) {
 
 export function createSession(scenario, catalog) {
   const memoryMap = new Map(catalog.memory_catalog.map((item) => [item.memory_id, clone(item)]));
+  const initialTime = `2026-08-25T${scenario.initial.time}:00+08:00`;
   return {
     scenario: clone(scenario),
     context: clone(scenario.initial),
+    initialObservation: {
+      schema_version: "1.0",
+      event_id: `initial_${scenario.id}`,
+      event_type: "context.initialized",
+      user_id: scenario.timeline[0]?.user_id ?? "usr_001",
+      trip_id: scenario.timeline[0]?.trip_id ?? "trip_simulation",
+      occurred_at: initialTime,
+      recorded_at: initialTime,
+      source: { type: "scenario_fixture" },
+      payload: { context: clone(scenario.initial) },
+      trace_id: `trace_${scenario.id}`
+    },
     memories: scenario.initial_memory_ids.map((id) => memoryMap.get(id)).filter(Boolean),
     appliedEvents: [],
     cursor: 0,
@@ -45,8 +58,15 @@ export function runToEnd(session) {
 }
 
 function evidence(session, eventType, fallback) {
-  const event = [...session.appliedEvents].reverse().find((item) => item.event_type.includes(eventType));
-  return [event?.event_id ?? fallback].filter(Boolean);
+  const event = [...session.appliedEvents, ...session.feedback]
+    .filter((item) => item.event_type.includes(eventType))
+    .sort((left, right) => Date.parse(right.occurred_at) - Date.parse(left.occurred_at))[0];
+  return [event?.event_id ?? session.initialObservation?.event_id ?? fallback].filter(Boolean);
+}
+
+function latestEvent(session) {
+  return [...session.appliedEvents, ...session.feedback]
+    .sort((left, right) => Date.parse(right.occurred_at) - Date.parse(left.occurred_at))[0];
 }
 
 export function inferState(session) {
@@ -60,7 +80,7 @@ export function inferState(session) {
   } else if (c.steps >= 10000) {
     dimensions.fatigue = { value: "uncertain", confidence: 0.45, evidence_ids: evidence(session, "activity", "current_step_count") };
   } else {
-    dimensions.fatigue = { value: "low", confidence: 0.69, evidence_ids: ["current_step_count"] };
+    dimensions.fatigue = { value: "low", confidence: 0.69, evidence_ids: evidence(session, "activity", "current_step_count") };
   }
 
   if (c.outdoorAtRisk && c.closingSoon) {
@@ -76,7 +96,7 @@ export function inferState(session) {
     value: c.recentIgnored >= 2 ? "low" : lowInterruptMemory ? "medium" : "high",
     confidence: c.recentIgnored >= 2 ? 0.86 : 0.68,
     evidence_ids: c.recentIgnored >= 2 ? evidence(session, "feedback", "recent_interaction")
-      : [lowInterruptMemory?.memory_id ?? "current_interaction_history"]
+      : [lowInterruptMemory?.memory_id ?? session.initialObservation?.event_id ?? "current_interaction_history"]
   };
 
   if (c.currentIntent === "continue_outdoor") {
@@ -103,10 +123,11 @@ export function inferState(session) {
   const observed = `2026-08-25T${c.time}:00+08:00`;
   return {
     state_id: `state_${session.scenario.id}_${session.cursor}`,
-    user_id: "usr_001",
-    trip_id: session.appliedEvents.at(-1)?.trip_id ?? "trip_simulation",
+    user_id: session.initialObservation?.user_id ?? "usr_001",
+    trip_id: latestEvent(session)?.trip_id ?? session.initialObservation?.trip_id ?? "trip_simulation",
     observed_at: observed,
     expires_at: `2026-08-25T23:59:00+08:00`,
+    sensitivity: "normal",
     dimensions,
     model_version: "deterministic-state-0.1"
   };
@@ -165,8 +186,8 @@ function memoryResult(session) {
 
 function sageFlowResult(session) {
   const c = session.context;
-  const state = inferState(session);
-  const d = state.dimensions;
+  const state = session.decisionContext?.state ?? inferState(session);
+  const d = state?.dimensions ?? {};
   const filters = ["permission_check", "privacy_check", "frequency_cap", "freshness_check", "confirmation_required", "service_policy_check"];
   const candidates = [
     makeAction(`act_${session.scenario.id}_silent`, "remain_silent", 0.52, 0, 0, 0, ["INTERRUPTION_COST_CONSIDERED"], "保持静默：当前行动价值没有超过打扰成本。"),
@@ -178,6 +199,18 @@ function sageFlowResult(session) {
   if (!c.permissions) {
     selected = makeAction(`act_${session.scenario.id}_permission`, "ask_permission", 0.58, 0.2, 0.02, c.urgency, ["LOCATION_PERMISSION_REQUIRED"], "需要获得位置授权后，我才能判断路线变化。", true);
     reason = "授权不足，禁止使用缺失的实时位置进行主动调整。";
+  } else if (session.decisionContext?.complete === false) {
+    selected = candidates[0];
+    const overflow = session.decisionContext.mandatory_overflow_count > 0;
+    const unavailable = (session.decisionContext.unavailable_mandatory_count ?? 0) > 0;
+    selected.reason_codes = [overflow ? "MANDATORY_EVIDENCE_OVERFLOW"
+      : unavailable ? "MANDATORY_EVIDENCE_UNAVAILABLE" : "STATE_UNAVAILABLE", "INCOMPLETE_DECISION_CONTEXT"];
+    selected.message = overflow ? "保持静默：关键约束超出本次可安全处理的证据容量。"
+      : unavailable ? "保持静默：有关键约束因范围或权限无法确认。"
+        : "保持静默：当前状态证据无效或已经过期。";
+    reason = overflow ? "必须证据不完整，不执行主动调整。"
+      : unavailable ? "关键约束不可用，不执行主动调整。"
+        : "状态不可用，不执行主动调整。";
   } else if (d.data_freshness?.value === "stale") {
     selected = candidates[0];
     selected.message = "保持静默：收到的强降雨信息已经过期，当前情境不支持再次打扰。";
@@ -238,7 +271,7 @@ function buildResult(mode, session, state, recalled, selected, reason, filters, 
     selected_action: selected,
     decision: {
       decision_id: `dec_${session.scenario.id}_${mode}_${session.cursor}`,
-      trigger_event_id: session.appliedEvents.at(-1)?.event_id ?? `initial_${session.scenario.id}`,
+      trigger_event_id: latestEvent(session)?.event_id ?? session.initialObservation?.event_id ?? `initial_${session.scenario.id}`,
       state_id: state?.state_id ?? null,
       candidate_action_ids: uniqueCandidates.map((item) => item.action_id),
       selected_action_id: selected.action_id,
@@ -246,7 +279,7 @@ function buildResult(mode, session, state, recalled, selected, reason, filters, 
       policy_filters_applied: filters,
       decision_reason: reason,
       policy_version: mode === "sageflow" ? "proactive-policy-0.1" : `${mode}-comparison-0.1`,
-      trace_id: session.appliedEvents.at(-1)?.trace_id ?? `trace_${session.scenario.id}`,
+      trace_id: latestEvent(session)?.trace_id ?? `trace_${session.scenario.id}`,
       recall_trace_id: session.recallBundle?.trace_id ?? null,
       matched_rule_ids: session.recallBundle?.matched_rules?.map((rule) => rule.memory_id) ?? []
     }
@@ -262,7 +295,11 @@ export function evaluateModes(session) {
 }
 
 export function applyFeedback(session, feedbackType, decisionId = "dec_current") {
-  const now = `2026-08-25T${session.context.time}:30+08:00`;
+  const contextAt = Date.parse(`2026-08-25T${session.context.time}:00+08:00`);
+  const previousAt = Date.parse(latestEvent(session)?.occurred_at ?? `2026-08-25T${session.context.time}:00+08:00`);
+  const localTime = new Date(Math.max(contextAt, previousAt) + 60_000 + 8 * 60 * 60_000).toISOString();
+  const now = `${localTime.slice(0, 19)}+08:00`;
+  session.context.time = localTime.slice(11, 16);
   const event = {
     schema_version: "1.0",
     event_id: `feedback_${session.scenario.id}_${session.feedback.length + 1}`,

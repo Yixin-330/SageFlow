@@ -8,10 +8,10 @@
     "edge_id": {"type": "string"},
     "user_id": {"type": "string"},
     "source_id": {"type": "string"},
-    "source_type": {"enum": ["memory", "observation_event", "decision", "feedback", "scope"]},
-    "relation": {"enum": ["SUPPORTED_BY", "DERIVED_FROM", "SUPERSEDES", "CONTRADICTS", "EXCEPTION_TO", "APPLIES_WHEN", "LED_TO_FEEDBACK", "USED_IN_DECISION"]},
+    "source_type": {"enum": ["memory", "observation_event", "decision", "feedback", "scope", "conflict"]},
+    "relation": {"enum": ["SUPPORTED_BY", "DERIVED_FROM", "PROMOTED_FROM", "SUPERSEDES", "CONTRADICTS", "EXCEPTION_TO", "APPLIES_WHEN", "LED_TO_FEEDBACK", "RECALLED_BEFORE_FEEDBACK", "USED_IN_DECISION", "RESOLVED_BY"]},
     "target_id": {"type": "string"},
-    "target_type": {"enum": ["memory", "observation_event", "decision", "feedback", "scope"]},
+    "target_type": {"enum": ["memory", "observation_event", "decision", "feedback", "scope", "conflict"]},
     "created_at": {"type": "string", "format": "date-time"},
     "evidence_event_ids": {"type": "array", "items": {"type": "string"}}
   }

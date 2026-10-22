@@ -10,11 +10,17 @@
     "trip_id": {"type": "string"},
     "observed_at": {"type": "string", "format": "date-time"},
     "expires_at": {"type": "string", "format": "date-time"},
+    "sensitivity": {"enum": ["normal", "sensitive"]},
     "dimensions": {
       "type": "object",
       "additionalProperties": {
         "type": "object",
-        "required": ["value", "confidence", "evidence_ids"]
+        "required": ["value", "confidence", "evidence_ids"],
+        "properties": {
+          "confidence": {"type": "number", "minimum": 0, "maximum": 1},
+          "evidence_ids": {"type": "array", "minItems": 1, "items": {"type": "string"}},
+          "sensitivity": {"enum": ["normal", "sensitive"]}
+        }
       }
     },
     "model_version": {"type": "string"}

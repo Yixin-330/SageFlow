@@ -52,6 +52,18 @@ _Avoid_: Global product rule, prompt instruction
 A Memory Candidate retained for more evidence because it is not safe or well-supported enough to become a Memory Item.
 _Avoid_: Low-confidence memory
 
+**Promotion Candidate**:
+An evidence-bearing input to possible long-term generalization, sourced from either a Pending Memory Candidate or a short-term Memory Item.
+_Avoid_: Promoted memory, Pending Memory Candidate
+
+**Promotion Group**:
+A collection of Promotion Candidates about the same subject, domain, kind, canonical claim, and safely comparable scope, evaluated together for long-term generalization.
+_Avoid_: Pending queue, long-term memory
+
+**Promotion Decision**:
+An auditable judgment about whether a Promotion Group should wait, seek confirmation, be rejected, expire, or produce a long-term Memory Item.
+_Avoid_: Memory Candidate, automatic tier change
+
 **Memory Edge**:
 An evidence-bearing relationship between memories or between a memory and its source, version, exception, conflict, decision, or feedback.
 _Avoid_: Tag

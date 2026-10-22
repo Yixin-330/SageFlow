@@ -1,3 +1,6 @@
+import { normalizeScope } from "./conflict-semantics.mjs";
+import { classifyAdmission } from "./promotion-policy.mjs";
+
 const LEGACY_TYPE = {
   short_term: { memory_tier: "short_term", memory_domain: "user", memory_kind: "semantic" },
   semantic_preference: { memory_tier: "long_term", memory_domain: "user", memory_kind: "semantic" },
@@ -21,7 +24,7 @@ export function inferMemoryDimensions(candidate) {
 }
 
 export function normalizeCandidate(candidate) {
-  return { ...clone(candidate), ...inferMemoryDimensions(candidate) };
+  return { ...clone(candidate), ...inferMemoryDimensions(candidate), scope: normalizeScope(candidate.scope) };
 }
 
 export function normalizeMemory(memory) {
@@ -36,22 +39,34 @@ export function normalizeMemory(memory) {
   return { ...clone(memory), ...dimensions, version: memory.version ?? 1, lineage_id: memory.lineage_id ?? memory.memory_id };
 }
 
-export function routeCandidate(candidate) {
+export function routeCandidate(candidate, evidenceEvents = []) {
   const normalized = normalizeCandidate(candidate);
+  // A trip-scoped retention request cannot become a cross-trip preference.
+  if (normalized.retention === "current_trip") normalized.memory_tier = "short_term";
   const predicate = normalized.statement?.predicate ?? "";
+  const admission = classifyAdmission(normalized, evidenceEvents);
 
   if (STATE_PREDICATES.test(predicate)) {
-    return { disposition: "reject", reason_code: "STATE_BELONGS_TO_STATE_MODEL", candidate: normalized };
+    return { disposition: "reject", reason_code: "STATE_BELONGS_TO_STATE_MODEL", candidate: normalized, admission };
   }
   if (normalized.confidence < 0.55) {
-    return { disposition: "pending", reason_code: "LOW_CONFIDENCE", candidate: normalized };
+    return { disposition: "pending", reason_code: "LOW_CONFIDENCE", candidate: normalized, admission };
   }
-  if (normalized.memory_tier === "long_term"
-    && normalized.evidence_kind === "inference"
-    && normalized.evidence_event_ids.length < 2) {
-    return { disposition: "pending", reason_code: "LONG_TERM_INFERENCE_NEEDS_MORE_EVIDENCE", candidate: normalized };
+  if (admission.path === "reject" || admission.reason_code === "DIRECT_LONG_TERM_NOT_ALLOWED") {
+    return { disposition: "reject", reason_code: admission.reason_code, candidate: normalized, admission };
   }
-  return { disposition: "store", reason_code: "ROUTED", candidate: normalized };
+  if (normalized.memory_tier === "long_term" && admission.reason_code === "LONG_TERM_CONFIRMATION_REQUIRED"
+    && ["explicit_statement", "user_correction"].includes(normalized.evidence_kind)) {
+    normalized.memory_tier = "short_term";
+    normalized.retention = "current_trip";
+    return { disposition: "store", reason_code: "TEMPORARY_CONSTRAINT_AWAITING_CONFIRMATION", candidate: normalized, admission };
+  }
+  if (normalized.memory_tier === "long_term" && admission.path !== "direct_long_term") {
+    const reasonCode = normalized.evidence_kind === "inference" && normalized.evidence_event_ids.length < 2
+      ? "LONG_TERM_INFERENCE_NEEDS_MORE_EVIDENCE" : admission.reason_code;
+    return { disposition: "pending", reason_code: reasonCode, candidate: normalized, admission };
+  }
+  return { disposition: "store", reason_code: "ROUTED", candidate: normalized, admission };
 }
 
 export function legacyMemoryType(memory) {

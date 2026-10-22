@@ -10,6 +10,8 @@
     "architecture": {"enum": ["flat", "typed", "hybrid"]},
     "selected_memory_ids": {"type": "array", "items": {"type": "string"}},
     "channel_counts": {"type": "object"},
+    "mandatory_overflow_count": {"type": "integer", "minimum": 0},
+    "context_complete": {"type": "boolean"},
     "omitted": {"type": "array"},
     "created_at": {"type": "string", "format": "date-time"}
   }

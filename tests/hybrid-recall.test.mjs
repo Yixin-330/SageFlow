@@ -20,7 +20,7 @@ function engine(memories, options = {}) {
   return { repository, memoryEngine: createMemoryEngine({ repository, extractor: createScriptedExtractor(), clock, ...options }) };
 }
 
-test("a budget constraint and current-trip intent survive a one-item recall limit", async () => {
+test("a hard budget remains mandatory while a trip observation is ranked, not mandatory", async () => {
   const trip = memory("trip_intent", "current_trip_pace", "walk_more", {
     memory_tier: "short_term", scope: { domain: "travel", applies_when: ["trip_hz"], topic: "pacing" }
   });
@@ -33,9 +33,27 @@ test("a budget constraint and current-trip intent survive a one-item recall limi
     user_id: "usr_1", purpose: "decision", trip_id: "trip_hz", query_text: "摄影展", limit: 1
   });
 
-  assert.deepEqual(new Set(result.mandatory_evidence.map((item) => item.memory.memory_id)), new Set(["budget", "trip_intent"]));
-  assert.ok(result.memories.length >= 2);
-  assert.deepEqual(result.trace.mandatory_memory_ids.sort(), ["budget", "trip_intent"]);
+  assert.deepEqual(result.mandatory_evidence.map((item) => item.memory.memory_id), ["budget"]);
+  assert.equal(result.memories.length, 1);
+  assert.deepEqual(result.trace.mandatory_memory_ids, ["budget"]);
+  const roomy = await memoryEngine.recall({ user_id: "usr_1", purpose: "decision", trip_id: "trip_hz", limit: 3 });
+  assert.ok(roomy.trip_memories.some((item) => item.memory.memory_id === "trip_intent"));
+  assert.ok(roomy.long_term_memories.some((item) => item.memory.memory_id === "photo"));
+  assert.ok(roomy.trip_memories.every((item) => item.layer === "trip"));
+});
+
+test("explicit trip commitment is mandatory, with bounded overflow reported in trace", async () => {
+  const commitments = Array.from({ length: 10 }, (_, index) => memory(`commit_${index}`, `choice_${index}`, `option_${index}`, {
+    memory_tier: "short_term", service_role: "commitment",
+    scope: { domain: "travel", trips: ["trip_hz"], topic: "trip_choices" }
+  }));
+  const { memoryEngine } = engine(commitments);
+  const result = await memoryEngine.recall({ user_id: "usr_1", purpose: "decision", trip_id: "trip_hz", limit: 1 });
+  assert.equal(result.memories.length, 8);
+  assert.equal(result.trace.mandatory_overflow_count, 2);
+  assert.equal(result.trace.context_complete, false);
+  assert.equal(result.omitted.filter((item) => item.reason_code === "MANDATORY_OVERFLOW").length, 2);
+  await assert.rejects(memoryEngine.recall({ user_id: "usr_1", purpose: "decision", trip_id: "trip_hz", limit: 1000 }), /Recall limit/);
 });
 
 test("sensitive memory and its graph edges are invisible without permission", async () => {
@@ -92,9 +110,11 @@ test("semantic channel can recover a paraphrase and reports its rank", async () 
 
 test("state snapshot is copied only while valid and is not promoted into memory", async () => {
   const { memoryEngine } = engine([]);
-  const state = { state_id: "state_now", expires_at: "2026-10-17T13:00:00+08:00", dimensions: { fatigue: "high" } };
-  const current = await memoryEngine.recall({ user_id: "usr_1", purpose: "decision", current_state: state });
-  const stale = await memoryEngine.recall({ user_id: "usr_1", purpose: "decision", current_state: { ...state, expires_at: "2026-10-17T11:00:00+08:00" } });
+  const state = { state_id: "state_now", user_id: "usr_1", trip_id: "trip_hz", observed_at: now,
+    expires_at: "2026-10-17T13:00:00+08:00", model_version: "test", sensitivity: "normal",
+    dimensions: { fatigue: { value: "high", confidence: 0.9, evidence_ids: ["evt_steps"] } } };
+  const current = await memoryEngine.recall({ user_id: "usr_1", trip_id: "trip_hz", purpose: "decision", current_state: state });
+  const stale = await memoryEngine.recall({ user_id: "usr_1", trip_id: "trip_hz", purpose: "decision", current_state: { ...state, expires_at: "2026-10-17T11:00:00+08:00" } });
 
   assert.equal(current.current_state.state_id, "state_now");
   assert.equal(stale.current_state, null);

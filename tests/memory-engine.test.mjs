@@ -60,6 +60,77 @@ test("observe creates an evidence-bearing memory from an explicit stable prefere
   assert.equal(result.memories[0].status, "active");
 });
 
+test("a registered numeric predicate rejects a string value instead of silently storing it", async () => {
+  const c = candidate("budget_string", "150", {
+    eventId: "evt_budget_string",
+    statement: { subject: "user", predicate: "comfortable_activity_budget_cny", value: "150" }
+  });
+  const result = await engineWith({ evt_budget_string: [c] }).observe([event("evt_budget_string")]);
+  assert.equal(result.memories.length, 0);
+  assert.equal(result.rejections[0].reason_code, "PREDICATE_VALUE_TYPE_MISMATCH");
+});
+
+test("action feedback links to recalled memories without rewriting a long-term preference", async () => {
+  const repository = createInMemoryMemoryRepository();
+  const engine = createMemoryEngine({ repository,
+    extractor: createScriptedExtractor({ evt_pace: [candidate("pace", "slow", { eventId: "evt_pace" })] }), clock });
+  await engine.observe([event("evt_pace")]);
+  const recall = await engine.recall({ user_id: "usr_001", trip_id: "trip_hangzhou_001",
+    purpose: "decision", predicates: ["prefers_travel_pace"], situation: { trip_kind: "leisure_trip" }, limit: 5 });
+  const feedback = event("evt_accepted", "feedback.action_accepted", { recall_trace_id: recall.trace_id, decision_id: "dec_1" });
+  const observed = await engine.observe([feedback]);
+  assert.equal(observed.mutations[0].operation, "NO_LONG_TERM_CHANGE");
+  assert.deepEqual(observed.mutations[0].supported_memory_ids, ["mem_pace"]);
+  assert.equal(observed.memories.find((item) => item.memory_id === "mem_pace").confidence, 0.84);
+  assert.ok((await repository.snapshot()).edges.some((item) => item.relation === "RECALLED_BEFORE_FEEDBACK"
+    && item.source_id === "mem_pace" && item.target_id === "evt_accepted"));
+  const foreign = await engine.observe([event("evt_bad_feedback", "feedback.action_ignored", { recall_trace_id: "missing" })]);
+  assert.equal(foreign.rejections[0].reason_code, "RECALL_TRACE_NOT_FOUND");
+});
+
+test("action feedback alone cannot be promoted into a preference candidate", async () => {
+  const attempted = candidate("from_acceptance", "fast", { eventId: "evt_acceptance" });
+  const result = await engineWith({ evt_acceptance: [attempted] })
+    .observe([event("evt_acceptance", "feedback.action_accepted", { decision_id: "dec_1" })]);
+  assert.equal(result.memories.length, 0);
+  assert.ok(result.rejections.some((item) => item.reason_code === "ACTION_FEEDBACK_NOT_PREFERENCE_EVIDENCE"));
+});
+
+test("explicit forgetting removes memory, evidence, graph, recall log and retains only a tombstone", async () => {
+  const repository = createInMemoryMemoryRepository();
+  const engine = createMemoryEngine({ repository,
+    extractor: createScriptedExtractor({ evt_forget: [candidate("forget", "slow", { eventId: "evt_forget" })] }), clock });
+  await engine.observe([event("evt_forget")]);
+  await engine.recall({ user_id: "usr_001", purpose: "decision", predicates: ["prefers_travel_pace"],
+    situation: { trip_kind: "leisure_trip" }, limit: 5 });
+  await assert.rejects(engine.forget({ user_id: "usr_001", memory_id: "mem_forget" }), /permission/);
+  const result = await engine.forget({ user_id: "usr_001", memory_id: "mem_forget", permissions: ["memory:forget"] });
+  assert.deepEqual(result.forgotten_memory_ids, ["mem_forget"]);
+  const snapshot = await repository.snapshot();
+  assert.equal(snapshot.memories.length, 0);
+  assert.equal(snapshot.observation_events.length, 0);
+  assert.equal(snapshot.edges.length, 0);
+  assert.equal(snapshot.recall_logs.length, 0);
+  assert.deepEqual(snapshot.tombstones.map((item) => item.memory_id), ["mem_forget"]);
+  assert.equal(snapshot.mutations.at(-1).operation, "FORGET");
+  const replay = await engine.observe([event("evt_forget")]);
+  assert.equal(replay.rejections[0].reason_code, "FORGOTTEN_MEMORY_TOMBSTONE");
+  assert.equal((await repository.snapshot()).memories.length, 0);
+});
+
+test("forget refuses partial deletion when another memory shares raw evidence", async () => {
+  const c1 = candidate("shared_a", "slow", { eventId: "evt_shared" });
+  const c2 = candidate("shared_b", "fast", { eventId: "evt_shared",
+    statement: { subject: "user", predicate: "prefers_activity_load", value: "light" } });
+  const repository = createInMemoryMemoryRepository();
+  const engine = createMemoryEngine({ repository,
+    extractor: createScriptedExtractor({ evt_shared: [c1, c2] }), clock });
+  await engine.observe([event("evt_shared")]);
+  await assert.rejects(engine.forget({ user_id: "usr_001", memory_id: "mem_shared_a",
+    permissions: ["memory:forget"] }), /Shared evidence/);
+  assert.equal((await repository.snapshot()).memories.length, 2);
+});
+
 test("a current-trip intention coexists with a different long-term preference", async () => {
   const seed = [{
     memory_id: "mem_slow",
@@ -98,6 +169,129 @@ test("a current-trip intention coexists with a different long-term preference", 
   assert.equal(result.mutations.some((item) => item.operation === "WEAKEN" || item.operation === "SUPERSEDE"), false);
   assert.deepEqual(new Set(recalled.memories.map((item) => item.memory.statement.value)), new Set(["slow", "fast"]));
   assert.equal(recalled.memories.find((item) => item.memory.statement.value === "fast").applicability, "current_trip");
+});
+
+test("a short-term observation never reinforces or resets a long-term memory", async () => {
+  const seed = [{
+    memory_id: "mem_slow",
+    memory_type: "semantic_preference",
+    user_id: "usr_001",
+    statement: { subject: "user", predicate: "prefers_travel_pace", value: "slow" },
+    scope: { domain: "travel", applies_when: ["leisure_trip"], topic: "travel_pacing" },
+    confidence: 0.86,
+    salience: 0.8,
+    evidence_event_ids: ["hist_001"],
+    valid_from: "2026-05-01T00:00:00+08:00",
+    last_confirmed_at: "2026-08-01T00:00:00+08:00",
+    status: "active",
+    sensitivity: "normal"
+  }];
+  const short = candidate("short_same", "slow", {
+    eventId: "evt_short_same",
+    memory_tier: "short_term",
+    retention: "short_lived",
+    expires_at: "2026-08-26T14:20:00+08:00",
+    scope: { domain: "travel", applies_when: ["leisure_trip"], topic: "travel_pacing" }
+  });
+  const result = await engineWith({ evt_short_same: [short] }, seed).observe([event("evt_short_same")]);
+
+  assert.equal(result.mutations[0].operation, "CREATE");
+  assert.equal(result.mutations.some((item) => item.operation === "REINFORCE"), false);
+  assert.equal(result.memories.find((item) => item.memory_id === "mem_slow").confidence, 0.86);
+  assert.equal(result.memories.find((item) => item.memory_id === "mem_slow").status, "active");
+  assert.equal(result.memories.find((item) => item.memory_id === "mem_short_same").memory_tier, "short_term");
+});
+
+test("a short-term correction creates a temporal exception instead of superseding a long-term preference", async () => {
+  const seed = [{
+    memory_id: "mem_slow",
+    memory_type: "semantic_preference",
+    user_id: "usr_001",
+    statement: { subject: "user", predicate: "prefers_travel_pace", value: "slow" },
+    scope: { domain: "travel", applies_when: ["leisure_trip"], topic: "travel_pacing" },
+    confidence: 0.86,
+    salience: 0.8,
+    evidence_event_ids: ["hist_001"],
+    valid_from: "2026-05-01T00:00:00+08:00",
+    last_confirmed_at: "2026-08-01T00:00:00+08:00",
+    status: "active",
+    sensitivity: "normal"
+  }];
+  const correction = candidate("short_fix", "fast", {
+    eventId: "evt_short_fix",
+    memory_tier: "short_term",
+    retention: "short_lived",
+    expires_at: "2026-08-26T14:20:00+08:00",
+    evidence_kind: "user_correction",
+    scope: { domain: "travel", applies_when: ["leisure_trip"], topic: "travel_pacing" }
+  });
+  const result = await engineWith({ evt_short_fix: [correction] }, seed)
+    .observe([event("evt_short_fix", "feedback.user_corrected")]);
+
+  assert.equal(result.mutations[0].operation, "CREATE");
+  assert.equal(result.mutations[0].coexistence_reason, "TEMPORAL_EXCEPTION");
+  assert.equal(result.mutations.some((item) => item.operation === "SUPERSEDE"), false);
+  assert.equal(result.memories.find((item) => item.memory_id === "mem_slow").status, "active");
+  assert.equal(result.memories.find((item) => item.memory_id === "mem_short_fix").status, "active");
+  assert.ok(result.relations.some((item) => item.relation === "EXCEPTION_TO"
+    && item.source_id === "mem_short_fix" && item.target_id === "mem_slow" && item.temporal_override === true));
+});
+
+test("current-trip retention downgrades a proposed long-term tier and binds recall to the evidence trip", async () => {
+  const proposed = candidate("trip_budget", "avoid_expensive_exhibit", {
+    eventId: "evt_trip_budget",
+    statement: { subject: "user", predicate: "current_trip_budget_intent", value: "avoid_expensive_exhibit" },
+    memory_tier: "long_term",
+    retention: "current_trip",
+    scope: { domain: "travel", topic: "activity_budget" }
+  });
+  const engine = engineWith({ evt_trip_budget: [proposed] });
+  const observed = await engine.observe([event("evt_trip_budget")]);
+  assert.equal(observed.memories[0].memory_tier, "short_term");
+  assert.deepEqual(observed.memories[0].scope.applies_when, ["trip_hangzhou_001"]);
+  const otherTrip = await engine.recall({ user_id: "usr_001", trip_id: "trip_beijing_001", purpose: "decision", topics: ["activity_budget"] });
+  assert.equal(otherTrip.memories.length, 0);
+  assert.ok(otherTrip.omitted.some((item) => item.reason_code === "OUT_OF_SCOPE"));
+});
+
+test("current-trip candidate without one evidence trip is rejected", async () => {
+  const proposed = candidate("unscoped_trip", "skip_exhibit", {
+    eventId: "evt_unscoped_trip",
+    retention: "current_trip",
+    scope: { domain: "travel", topic: "activity_interest" }
+  });
+  const engine = engineWith({ evt_unscoped_trip: [proposed] });
+  const result = await engine.observe([{ ...event("evt_unscoped_trip"), trip_id: undefined }]);
+  assert.equal(result.memories.length, 0);
+  assert.equal(result.rejections[0].reason_code, "CURRENT_TRIP_SCOPE_REQUIRED");
+});
+
+test("long-term interest, trip-specific constraint, and live state appear together in recall", async () => {
+  const interest = candidate("photo_interest", "photography", {
+    eventId: "evt_photo_interest",
+    statement: { subject: "user", predicate: "likes_experience", value: "photography" },
+    scope: { domain: "travel", topic: "activity_interest" }
+  });
+  const budget = candidate("trip_budget_coexist", "avoid_expensive", {
+    eventId: "evt_budget_coexist",
+    statement: { subject: "user", predicate: "current_trip_budget_intent", value: "avoid_expensive" },
+    proposed_type: "short_term",
+    retention: "current_trip",
+    scope: { domain: "travel", topic: "activity_budget" }
+  });
+  const engine = engineWith({ evt_photo_interest: [interest], evt_budget_coexist: [budget] });
+  await engine.observe([event("evt_photo_interest")]);
+  await engine.observe([event("evt_budget_coexist")]);
+  const currentState = { state_id: "state_coexist", user_id: "usr_001", trip_id: "trip_hangzhou_001",
+    observed_at: fixedNow, expires_at: "2026-08-25T15:20:00+08:00", model_version: "test", sensitivity: "normal",
+    dimensions: { fatigue: { value: "high", confidence: 0.9, evidence_ids: ["evt_fatigue"] } } };
+  const recall = await engine.recall({ user_id: "usr_001", trip_id: "trip_hangzhou_001", purpose: "decision",
+    topics: ["activity_interest", "activity_budget"], current_state: currentState, limit: 5 });
+  assert.deepEqual(new Set(recall.memories.map((item) => item.memory.statement.value)), new Set(["photography", "avoid_expensive"]));
+  assert.deepEqual(recall.current_state, currentState);
+  const nextTrip = await engine.recall({ user_id: "usr_001", trip_id: "trip_beijing_001", purpose: "decision",
+    topics: ["activity_interest", "activity_budget"], limit: 5 });
+  assert.deepEqual(nextTrip.memories.map((item) => item.memory.statement.value), ["photography"]);
 });
 
 test("a rejection with unknown reason does not change long-term preference", async () => {
@@ -160,6 +354,42 @@ test("contradictory long-term evidence forms a conflict set without overwriting 
   assert.equal(recalled.conflicts.length, 1);
   assert.equal(recalled.conflicts[0].memory_ids.length, 2);
   assert.ok(recalled.relations.some((item) => item.relation === "CONTRADICTS"));
+  assert.ok(recalled.memories.every((item) => item.disputed === true));
+});
+
+test("different positive interests coexist without a false conflict", async () => {
+  const photo = candidate("photo_seed", "photography", { eventId: "evt_photo_seed",
+    statement: { subject: "user", predicate: "likes_experience", value: "photography" },
+    scope: { domain: "travel", topic: "activity_interest" } });
+  const engine = engineWith({ evt_photo_seed: [photo], evt_hike: [candidate("hike", "hiking", {
+    eventId: "evt_hike", statement: { subject: "user", predicate: "likes_experience", value: "hiking" },
+    scope: { domain: "travel", topic: "activity_interest" }
+  })] });
+  await engine.observe([event("evt_photo_seed")]);
+  const result = await engine.observe([event("evt_hike")]);
+  assert.equal(result.conflicts.length, 0);
+  assert.deepEqual(new Set(result.memories.map((item) => item.statement.value)), new Set(["photography", "hiking"]));
+});
+
+test("a correction event closes an open conflict even if the extractor says explicit_statement", async () => {
+  const script = {
+    evt_old: [candidate("old_pace", "slow", { eventId: "evt_old" })],
+    evt_opposite: [candidate("opposite_pace", "fast", { eventId: "evt_opposite" })],
+    evt_fix: [candidate("fix_pace", "moderate", { eventId: "evt_fix", evidence_kind: "explicit_statement" })]
+  };
+  const repository = createInMemoryMemoryRepository();
+  const engine = createMemoryEngine({ repository, extractor: createScriptedExtractor(script), clock });
+  await engine.observe([event("evt_old")]);
+  const conflicted = await engine.observe([event("evt_opposite")]);
+  assert.equal(conflicted.conflicts.length, 1);
+  const corrected = await engine.observe([event("evt_fix", "feedback.user_corrected")]);
+  assert.equal(corrected.conflicts.length, 0);
+  assert.equal(corrected.memories.filter((item) => item.status === "superseded").length, 2);
+  assert.equal(corrected.memories.filter((item) => item.status === "active")[0].statement.value, "moderate");
+  const snapshot = await repository.snapshot();
+  assert.equal(snapshot.conflicts[0].status, "resolved");
+  assert.equal(snapshot.conflicts[0].resolution_reason, "USER_CORRECTION");
+  assert.ok(snapshot.edges.some((item) => item.relation === "RESOLVED_BY"));
 });
 
 test("an explicit user correction supersedes the wrong memory and preserves its history", async () => {
@@ -300,12 +530,13 @@ test("hybrid architecture records evidence and conflict graph edges", async () =
 });
 
 test("a scoped long-term exception coexists and links back to the general memory", async () => {
-  const broad = candidate("broad_slow", "slow", { eventId: "evt_broad" });
+  const broad = candidate("broad_slow", "slow", { eventId: "evt_broad",
+    scope: { domain: "travel", topic: "travel_pacing" } });
   const seedEngine = engineWith({ evt_broad: [broad] });
   const seeded = await seedEngine.observe([event("evt_broad")]);
   const exception = candidate("business_fast", "fast", {
     eventId: "evt_exception",
-    scope: { domain: "travel", applies_when: ["business_trip"], topic: "travel_pacing" }
+    scope: { domain: "travel", situations: [{ field: "trip_kind", value: "business_trip" }], topic: "travel_pacing" }
   });
   const engine = engineWith({ evt_exception: [exception] }, seeded.memories);
 
@@ -315,6 +546,20 @@ test("a scoped long-term exception coexists and links back to the general memory
   assert.equal(result.mutations[0].operation, "CREATE");
   assert.equal(result.mutations[0].coexistence_reason, "SCOPED_EXCEPTION");
   assert.ok(recall.relations.some((item) => item.relation === "EXCEPTION_TO"));
+});
+
+test("a newly stated general preference does not become the exception to an older narrow preference", async () => {
+  const narrow = candidate("business_fast_first", "fast", { eventId: "evt_narrow",
+    scope: { domain: "travel", situations: [{ field: "trip_kind", value: "business_trip" }], topic: "travel_pacing" } });
+  const engine = engineWith({ evt_narrow: [narrow], evt_general: [candidate("general_slow_second", "slow", {
+    eventId: "evt_general", scope: { domain: "travel", topic: "travel_pacing" }
+  })] });
+  await engine.observe([event("evt_narrow")]);
+  const result = await engine.observe([event("evt_general")]);
+  const edge = result.relations.find((item) => item.relation === "EXCEPTION_TO");
+  assert.equal(edge.source_id, "mem_business_fast_first");
+  assert.equal(edge.target_id, "mem_general_slow_second");
+  assert.equal(result.conflicts.length, 0);
 });
 
 test("one broad memory can split into multiple versioned branches", async () => {

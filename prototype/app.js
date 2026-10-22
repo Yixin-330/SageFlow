@@ -19,7 +19,7 @@ import { runDecisionCycleEvaluation } from "/src/decision-cycle-evaluation.mjs";
 const [catalog, memoryEvaluationSuite, humanReviewText] = await Promise.all([
   fetch("/scenarios/catalog.json").then((response) => response.json()),
   fetch("/evaluation/memory-cases.json").then((response) => response.json()),
-  fetch("/evaluation/human-memory-review.jsonl").then((response) => response.text())
+  fetch("/evaluation/human-memory-review-v2.jsonl").then((response) => response.text())
 ]);
 const memoryEvaluationReport = await runMemoryEvaluation(memoryEvaluationSuite, catalog.memory_catalog);
 const cycleEvaluationReport = await runDecisionCycleEvaluation(catalog);
@@ -238,6 +238,7 @@ function memoryPipelineInspector() {
   const mutationCount = update?.mutations?.length ?? 0;
   const rejectedCount = update?.rejections?.length ?? 0;
   const pendingCount = update?.pending_candidates?.length ?? 0;
+  const audit = ui.cycleResult?.audit;
   return `
     <div class="memory-pipeline">
       <div><span>候选</span><b>${candidateCount}</b></div>
@@ -248,6 +249,8 @@ function memoryPipelineInspector() {
       <div><span>服务规则</span><b>${recall?.matched_rules?.length ?? 0}</b></div>
       <div><span>待确认</span><b>${pendingCount}</b></div>
       <div><span>排除</span><b>${(recall?.omitted?.length ?? 0) + rejectedCount}</b></div>
+      <div><span>状态证据审计</span><b>${audit?.passed ? "通过" : "—"}</b></div>
+      <div><span>历史来源待核验</span><b>${audit?.historical_memory_evidence_unverified?.length ?? 0}</b></div>
     </div>
     ${update?.mutations?.length ? `<div class="mutation-trace">${update.mutations.map((item) => `<span><b>${item.operation}</b>${esc(item.reason_code ?? item.coexistence_reason ?? item.target_memory_id ?? "已记录")}</span>`).join("")}</div>` : `<p class="pipeline-empty">尚未产生新的 Memory Mutation；当前显示初始记忆召回。</p>`}
     ${recall?.memories?.length ? `<div class="recall-scores">${recall.memories.slice(0, 4).map((item) => `<span><b>${item.score.toFixed(2)}</b>${esc(item.memory.label ?? item.memory.statement.predicate)}</span>`).join("")}</div>` : ""}`;
@@ -287,7 +290,7 @@ function feedbackBar(result) {
 
 function evaluationPanel(compact = false) {
   const report = cycleEvaluationReport;
-  const labels = { protocol: "数据协议", memory: "记忆召回", state: "状态模型", decision: "主动决策", trace: "证据追踪", feedback: "反馈闭环" };
+  const labels = { protocol: "数据协议", memory: "记忆召回", state: "状态模型", decision: "主动决策", trace: "追踪关联", audit: "证据审计", feedback: "反馈闭环" };
   return `
     <section class="panel evaluation-panel ${compact ? "compact" : ""}">
       <div class="panel-heading">
@@ -399,7 +402,7 @@ function comparisonTable(results) {
 
 function evalCaseTable() {
   const report = cycleEvaluationReport;
-  return `<div class="case-table"><div class="case-head"><span>场景</span><span>协议</span><span>记忆</span><span>状态</span><span>决策</span><span>追踪</span><span>反馈</span><span>结果</span></div>${report.cases.map((item) => `<div class="case-row ${item.scenario_id === ui.scenarioId ? "current" : ""}" data-scenario="${item.scenario_id}"><span><b>${item.scenario_id}</b>${esc(item.title)}</span>${Object.values(item.checks).map((pass) => `<span class="check ${pass ? "pass" : "fail"}">${pass ? "✓" : "×"}</span>`).join("")}<span class="case-result">${item.passed ? "通过" : "失败"}</span></div>`).join("")}</div>`;
+  return `<div class="case-table"><div class="case-head"><span>场景</span><span>协议</span><span>记忆</span><span>状态</span><span>决策</span><span>追踪</span><span>审计</span><span>反馈</span><span>结果</span></div>${report.cases.map((item) => `<div class="case-row ${item.scenario_id === ui.scenarioId ? "current" : ""}" data-scenario="${item.scenario_id}"><span><b>${item.scenario_id}</b>${esc(item.title)}</span>${Object.values(item.checks).map((pass) => `<span class="check ${pass ? "pass" : "fail"}">${pass ? "✓" : "×"}</span>`).join("")}<span class="case-result">${item.passed ? "通过" : "失败"}</span></div>`).join("")}</div>`;
 }
 
 function variantC() {

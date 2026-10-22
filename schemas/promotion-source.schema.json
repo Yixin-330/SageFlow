@@ -1,0 +1,20 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://sageflow.local/schemas/promotion-source.schema.json",
+  "title": "PromotionCandidate",
+  "type": "object",
+  "required": ["group_id", "user_id", "claim", "memory_domain", "memory_kind", "scope_anchor", "source_type", "source_id", "candidate_id", "policy_version", "evidence"],
+  "properties": {
+    "group_id": {"type": "string"},
+    "user_id": {"type": "string"},
+    "claim": {"type": "object", "required": ["subject", "predicate", "value"]},
+    "memory_domain": {"enum": ["user", "relational", "shared"]},
+    "memory_kind": {"enum": ["episodic", "semantic", "procedural"]},
+    "scope_anchor": {"type": "object"},
+    "source_type": {"enum": ["pending", "short_term"]},
+    "source_id": {"type": "string"},
+    "candidate_id": {"type": "string"},
+    "policy_version": {"type": "string"},
+    "evidence": {"type": "array", "minItems": 1, "items": {"type": "object", "required": ["event_id", "occurrence_id", "occurred_at", "evidence_kind", "source_refs"]}}
+  }
+}

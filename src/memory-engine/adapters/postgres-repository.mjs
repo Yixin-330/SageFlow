@@ -167,6 +167,101 @@ function buildRepository(queryable, { transactional = false } = {}) {
       ));
     },
 
+    async expirePendingCandidates(now, limit = 100) {
+      if (!transactional) throw new Error("Pending expiry requires a repository transaction");
+      const due = rows(await queryable.query(
+        `SELECT document FROM memory_pending_candidates
+         WHERE status = 'pending' AND (document->>'observation_deadline_at')::timestamptz <= $1
+         ORDER BY (document->>'observation_deadline_at')::timestamptz
+         LIMIT $2 FOR UPDATE SKIP LOCKED`,
+        [now, limit]
+      ));
+      for (const item of due) {
+        item.status = "expired";
+        item.expired_at = now;
+        item.status_reason = "OBSERVATION_WINDOW_EXPIRED";
+        await repository.appendPendingCandidate(item);
+      }
+      return due;
+    },
+
+    async lockPromotionGroup(userId, groupId) {
+      if (!transactional) throw new Error("Promotion group lock requires a repository transaction");
+      await queryable.query("SELECT pg_advisory_xact_lock(hashtextextended($1 || ':' || $2, 0))", [userId, groupId]);
+    },
+    async lockPromotionClaim(userId, claimKey) {
+      if (!transactional) throw new Error("Promotion claim lock requires a repository transaction");
+      await queryable.query("SELECT pg_advisory_xact_lock(hashtextextended($1 || ':' || $2, 0))", [userId, `claim:${claimKey}`]);
+    },
+
+    async getPromotionGroup(userId, groupId) {
+      return rows(await queryable.query(
+        "SELECT document FROM memory_promotion_groups WHERE user_id = $1 AND group_id = $2",
+        [userId, groupId]
+      ))[0] ?? null;
+    },
+
+    async listPromotionGroupsByUser(userId) {
+      return rows(await queryable.query(
+        "SELECT document FROM memory_promotion_groups WHERE user_id = $1",
+        [userId]
+      ));
+    },
+    async listPromotionGroupsByClaim(userId, claim, domain, kind) {
+      return rows(await queryable.query(
+        `SELECT document FROM memory_promotion_groups WHERE user_id = $1
+          AND document->'claim'->>'subject' = $2 AND document->'claim'->>'predicate' = $3
+          AND document->>'memory_domain' = $4 AND document->>'memory_kind' = $5`,
+        [userId, claim.subject, claim.predicate, domain, kind]
+      ));
+    },
+    async getPromotionResult(userId, promotionKey) {
+      return rows(await queryable.query(
+        "SELECT document FROM memory_promotion_results WHERE user_id = $1 AND promotion_key = $2",
+        [userId, promotionKey]
+      ))[0] ?? null;
+    },
+    async recordPromotionResult(record) {
+      const result = await queryable.query(
+        `INSERT INTO memory_promotion_results (user_id, promotion_key, group_id, memory_id, document)
+         VALUES ($1, $2, $3, $4, $5::jsonb)
+         ON CONFLICT (user_id, promotion_key) DO NOTHING RETURNING document`,
+        [record.user_id, record.promotion_key, record.group_id, record.memory_id, json(record)]
+      );
+      return rows(result)[0] ?? repository.getPromotionResult(record.user_id, record.promotion_key);
+    },
+
+    async upsertPromotionGroup(record) {
+      await queryable.query(
+        `INSERT INTO memory_promotion_groups (user_id, group_id, status, observation_deadline_at, document)
+         VALUES ($1, $2, $3, $4, $5::jsonb)
+         ON CONFLICT (user_id, group_id) DO UPDATE SET
+           status = EXCLUDED.status, observation_deadline_at = EXCLUDED.observation_deadline_at,
+           document = EXCLUDED.document, updated_at = NOW()`,
+        [record.user_id, record.group_id, record.status, record.observation_deadline_at, json(record)]
+      );
+      return record;
+    },
+
+    async expirePromotionGroups(now, limit = 100) {
+      if (!transactional) throw new Error("Promotion group expiry requires a repository transaction");
+      const due = rows(await queryable.query(
+        `SELECT document FROM memory_promotion_groups
+         WHERE status IN ('collecting', 'eligible', 'needs_confirmation', 'blocked_by_counter_evidence')
+           AND observation_deadline_at <= $1
+         ORDER BY observation_deadline_at LIMIT $2 FOR UPDATE SKIP LOCKED`,
+        [now, limit]
+      ));
+      for (const item of due) {
+        item.status = "expired";
+        item.expired_at = now;
+        item.last_evaluated_at = now;
+        item.status_reason = "OBSERVATION_WINDOW_EXPIRED";
+        await repository.upsertPromotionGroup(item);
+      }
+      return due;
+    },
+
     async appendRecallLog(record) {
       await queryable.query(
         `INSERT INTO memory_recall_logs (user_id, trace_id, purpose, document)
@@ -175,6 +270,71 @@ function buildRepository(queryable, { transactional = false } = {}) {
         [record.user_id, record.trace_id, record.purpose, json(record)]
       );
       return record;
+    },
+
+    async getRecallLog(userId, traceId) {
+      return rows(await queryable.query(
+        "SELECT document FROM memory_recall_logs WHERE user_id = $1 AND trace_id = $2",
+        [userId, traceId]
+      ))[0] ?? null;
+    },
+
+    async isForgottenMemory(userId, memoryId) {
+      const result = await queryable.query(
+        "SELECT 1 FROM memory_tombstones WHERE user_id = $1 AND memory_id = $2",
+        [userId, memoryId]
+      );
+      return result.rows.length > 0;
+    },
+
+    async forgetArtifacts(userId, memoryIds, evidenceEventIds, forgottenAt) {
+      if (!transactional) throw new Error("Forgetting requires a repository transaction");
+      const vectorTable = await queryable.query("SELECT to_regclass('memory_embeddings') AS table_name");
+      if (vectorTable.rows[0]?.table_name) {
+        await queryable.query("DELETE FROM memory_embeddings WHERE user_id = $1 AND memory_id = ANY($2::text[])", [userId, memoryIds]);
+      }
+      await queryable.query(
+        "DELETE FROM memory_edges WHERE user_id = $1 AND (source_id = ANY($2::text[]) OR target_id = ANY($2::text[]) OR source_id = ANY($3::text[]) OR target_id = ANY($3::text[]))",
+        [userId, memoryIds, evidenceEventIds]
+      );
+      await queryable.query(
+        "DELETE FROM memory_conflict_sets WHERE user_id = $1 AND (document->'memory_ids') ?| $2::text[]",
+        [userId, memoryIds]
+      );
+      await queryable.query(
+        `DELETE FROM memory_pending_candidates WHERE user_id = $1 AND
+          ((document->'evidence_event_ids') ?| $2::text[] OR (document->'candidate'->'evidence_event_ids') ?| $2::text[])`,
+        [userId, evidenceEventIds]
+      );
+      await queryable.query(
+        `DELETE FROM memory_promotion_groups WHERE user_id = $1 AND
+          ((document->'source_memory_ids') ?| $2::text[] OR (document->'evidence_event_ids') ?| $3::text[]
+            OR document->>'promoted_memory_id' = ANY($2::text[]))`,
+        [userId, memoryIds, evidenceEventIds]
+      );
+      await queryable.query(
+        `DELETE FROM memory_promotion_results WHERE user_id = $1 AND
+          (memory_id = ANY($2::text[]) OR (document->'evidence_event_ids') ?| $3::text[])`,
+        [userId, memoryIds, evidenceEventIds]
+      );
+      await queryable.query(
+        `DELETE FROM memory_recall_logs WHERE user_id = $1 AND (
+          (document->'selected_memory_ids') ?| $2::text[]
+          OR EXISTS (SELECT 1 FROM jsonb_array_elements(COALESCE(document->'omitted', '[]'::jsonb)) entry
+            WHERE entry->>'memory_id' = ANY($2::text[])))`,
+        [userId, memoryIds]
+      );
+      await queryable.query("DELETE FROM observation_events WHERE user_id = $1 AND event_id = ANY($2::text[])",
+        [userId, evidenceEventIds]);
+      await queryable.query("DELETE FROM memory_items WHERE user_id = $1 AND memory_id = ANY($2::text[])",
+        [userId, memoryIds]);
+      for (const memoryId of memoryIds) {
+        await queryable.query(
+          `INSERT INTO memory_tombstones (user_id, memory_id, forgotten_at)
+           VALUES ($1, $2, $3) ON CONFLICT (user_id, memory_id) DO UPDATE SET forgotten_at = EXCLUDED.forgotten_at`,
+          [userId, memoryId, forgottenAt]
+        );
+      }
     },
 
     async healthCheck() {

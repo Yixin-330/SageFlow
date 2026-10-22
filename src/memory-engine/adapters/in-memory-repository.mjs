@@ -1,4 +1,5 @@
 import { clone, normalizeMemory } from "../memory-model.mjs";
+import { conflictRelation } from "../conflict-semantics.mjs";
 
 export function createInMemoryMemoryRepository(seed = []) {
   const memories = new Map(seed.map((item) => {
@@ -11,6 +12,9 @@ export function createInMemoryMemoryRepository(seed = []) {
   const pendingCandidates = new Map();
   const observationEvents = new Map();
   const recallLogs = new Map();
+  const tombstones = new Map();
+  const promotionGroups = new Map();
+  const promotionResults = new Map();
 
   for (const memory of memories.values()) {
     for (const eventId of memory.evidence_event_ids ?? []) {
@@ -48,11 +52,8 @@ export function createInMemoryMemoryRepository(seed = []) {
     for (let rightIndex = leftIndex + 1; rightIndex < active.length; rightIndex += 1) {
       const left = active[leftIndex];
       const right = active[rightIndex];
-      const samePredicate = left.user_id === right.user_id
-        && left.statement?.predicate === right.statement?.predicate
-        && left.scope?.domain === right.scope?.domain;
-      const differentValue = JSON.stringify(left.statement?.value) !== JSON.stringify(right.statement?.value);
-      if (samePredicate && differentValue) {
+      const relation = left.user_id === right.user_id ? conflictRelation(left, right) : "none";
+      if (relation === "equal" || relation === "overlap") {
         const memoryIds = [left.memory_id, right.memory_id].sort();
         const id = `conflict_${memoryIds.join("_")}`;
         conflicts.set(`${left.user_id}:${id}`, {
@@ -62,7 +63,7 @@ export function createInMemoryMemoryRepository(seed = []) {
           memory_ids: memoryIds,
           status: "open",
           created_at: left.last_confirmed_at,
-          reason_code: "SEEDED_INCOMPATIBLE_VALUES"
+          reason_code: relation === "equal" ? "SEEDED_INCOMPATIBLE_VALUES" : "SEEDED_OVERLAPPING_SCOPE"
         });
         const edgeId = `edge_CONTRADICTS_${memoryIds.join("_")}`;
         edges.set(`${left.user_id}:${edgeId}`, {
@@ -75,6 +76,21 @@ export function createInMemoryMemoryRepository(seed = []) {
           target_type: "memory",
           created_at: left.last_confirmed_at,
           evidence_event_ids: []
+        });
+      } else if (relation === "a_covers_b" || relation === "b_covers_a") {
+        const specific = relation === "a_covers_b" ? right : left;
+        const general = relation === "a_covers_b" ? left : right;
+        const edgeId = `edge_EXCEPTION_TO_${specific.memory_id}_${general.memory_id}`;
+        edges.set(`${left.user_id}:${edgeId}`, {
+          edge_id: edgeId,
+          user_id: left.user_id,
+          source_id: specific.memory_id,
+          source_type: "memory",
+          relation: "EXCEPTION_TO",
+          target_id: general.memory_id,
+          target_type: "memory",
+          created_at: specific.last_confirmed_at,
+          evidence_event_ids: [...specific.evidence_event_ids]
         });
       }
     }
@@ -133,9 +149,100 @@ export function createInMemoryMemoryRepository(seed = []) {
     async listPendingCandidates(userId) {
       return clone([...pendingCandidates.values()].filter((item) => item.user_id === userId));
     },
+    async expirePendingCandidates(now, limit = 100) {
+      const due = [...pendingCandidates.values()].filter((item) => item.status === "pending"
+        && item.observation_deadline_at && Date.parse(item.observation_deadline_at) <= Date.parse(now))
+        .sort((a, b) => a.observation_deadline_at.localeCompare(b.observation_deadline_at)).slice(0, limit);
+      for (const item of due) {
+        item.status = "expired";
+        item.expired_at = now;
+        item.status_reason = "OBSERVATION_WINDOW_EXPIRED";
+        pendingCandidates.set(`${item.user_id}:${item.pending_id}`, clone(item));
+      }
+      return clone(due);
+    },
+    async getPromotionGroup(userId, groupId) {
+      const record = promotionGroups.get(`${userId}:${groupId}`);
+      return record ? clone(record) : null;
+    },
+    async listPromotionGroupsByUser(userId) {
+      return clone([...promotionGroups.values()].filter((item) => item.user_id === userId));
+    },
+    async listPromotionGroupsByClaim(userId, claim, domain, kind) {
+      return clone([...promotionGroups.values()].filter((item) => item.user_id === userId
+        && item.claim.subject === claim.subject && item.claim.predicate === claim.predicate
+        && item.memory_domain === domain && item.memory_kind === kind));
+    },
+    async getPromotionResult(userId, promotionKey) {
+      return clone(promotionResults.get(`${userId}:${promotionKey}`) ?? null);
+    },
+    async recordPromotionResult(record) {
+      const key = `${record.user_id}:${record.promotion_key}`;
+      if (promotionResults.has(key)) return clone(promotionResults.get(key));
+      promotionResults.set(key, clone(record));
+      return clone(record);
+    },
+    async upsertPromotionGroup(record) {
+      promotionGroups.set(`${record.user_id}:${record.group_id}`, clone(record));
+      return clone(record);
+    },
+    async expirePromotionGroups(now, limit = 100) {
+      const due = [...promotionGroups.values()].filter((item) =>
+        ["collecting", "eligible", "needs_confirmation", "blocked_by_counter_evidence"].includes(item.status)
+        && Date.parse(item.observation_deadline_at) <= Date.parse(now))
+        .sort((a, b) => a.observation_deadline_at.localeCompare(b.observation_deadline_at)).slice(0, limit);
+      for (const item of due) {
+        item.status = "expired";
+        item.expired_at = now;
+        item.last_evaluated_at = now;
+        item.status_reason = "OBSERVATION_WINDOW_EXPIRED";
+        promotionGroups.set(`${item.user_id}:${item.group_id}`, clone(item));
+      }
+      return clone(due);
+    },
     async appendRecallLog(record) {
       recallLogs.set(`${record.user_id}:${record.trace_id}`, clone(record));
       return clone(record);
+    },
+    async getRecallLog(userId, traceId) {
+      const record = recallLogs.get(`${userId}:${traceId}`);
+      return record ? clone(record) : null;
+    },
+    async isForgottenMemory(userId, memoryId) {
+      return tombstones.has(`${userId}:${memoryId}`);
+    },
+    async forgetArtifacts(userId, memoryIds, evidenceEventIds, forgottenAt) {
+      const ids = new Set(memoryIds);
+      const evidence = new Set(evidenceEventIds);
+      for (const id of ids) {
+        memories.delete(`${userId}:${id}`);
+        tombstones.set(`${userId}:${id}`, { user_id: userId, memory_id: id, forgotten_at: forgottenAt });
+      }
+      for (const [key, item] of edges) {
+        if (item.user_id === userId && (ids.has(item.source_id) || ids.has(item.target_id)
+          || evidence.has(item.source_id) || evidence.has(item.target_id))) edges.delete(key);
+      }
+      for (const [key, item] of conflicts) {
+        if (item.user_id === userId && item.memory_ids.some((id) => ids.has(id))) conflicts.delete(key);
+      }
+      for (const [key, item] of pendingCandidates) {
+        if (item.user_id === userId && (item.evidence_event_ids ?? item.candidate?.evidence_event_ids ?? [])
+          .some((id) => evidence.has(id))) pendingCandidates.delete(key);
+      }
+      for (const [key, item] of promotionGroups) {
+        if (item.user_id === userId && ((item.evidence_event_ids ?? []).some((id) => evidence.has(id))
+          || (item.source_memory_ids ?? []).some((id) => ids.has(id))
+          || ids.has(item.promoted_memory_id))) promotionGroups.delete(key);
+      }
+      for (const [key, item] of promotionResults) {
+        if (item.user_id === userId && (ids.has(item.memory_id)
+          || (item.evidence_event_ids ?? []).some((id) => evidence.has(id)))) promotionResults.delete(key);
+      }
+      for (const [key, item] of recallLogs) {
+        if (item.user_id === userId && ((item.selected_memory_ids ?? []).some((id) => ids.has(id))
+          || (item.omitted ?? []).some((entry) => ids.has(entry.memory_id)))) recallLogs.delete(key);
+      }
+      for (const id of evidence) observationEvents.delete(`${userId}:${id}`);
     },
     async snapshot() {
       return {
@@ -144,8 +251,11 @@ export function createInMemoryMemoryRepository(seed = []) {
         mutations: clone(mutations),
         edges: clone([...edges.values()]),
         pending_candidates: clone([...pendingCandidates.values()]),
+        promotion_groups: clone([...promotionGroups.values()]),
+        promotion_results: clone([...promotionResults.values()]),
         observation_events: clone([...observationEvents.values()]),
-        recall_logs: clone([...recallLogs.values()])
+        recall_logs: clone([...recallLogs.values()]),
+        tombstones: clone([...tombstones.values()])
       };
     }
   };

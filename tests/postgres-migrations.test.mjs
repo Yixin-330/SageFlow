@@ -21,10 +21,13 @@ test("migration runner applies ordered SQL files transactionally", async () => {
     "001_memory_engine.sql",
     "002_typed_memory_graph.sql",
     "003_persistence_runtime.sql",
-    "004_retrieval_text_index.sql"
+    "004_retrieval_text_index.sql",
+    "005_memory_forgetting.sql",
+    "006_promotion_groups.sql",
+    "007_promotion_results.sql"
   ]);
-  assert.equal(statements.filter((item) => item.text === "BEGIN").length, 4);
-  assert.equal(statements.filter((item) => item.text === "COMMIT").length, 4);
+  assert.equal(statements.filter((item) => item.text === "BEGIN").length, 7);
+  assert.equal(statements.filter((item) => item.text === "COMMIT").length, 7);
   assert.equal(released, true);
 });
 

@@ -205,7 +205,7 @@ button.primary:hover:not(:disabled) { background: #56e2d5; border-color: #56e2d5
 
 .evaluation-panel { margin-top: 10px; padding-bottom: 13px; }
 .pass-total { display: flex; align-items: center; gap: 8px; color: var(--teal); font-size: 10px; }
-.metric-row { display: grid; grid-template-columns: repeat(6,1fr); gap: 8px; padding: 13px 15px 6px; }
+.metric-row { display: grid; grid-template-columns: repeat(7,1fr); gap: 8px; padding: 13px 15px 6px; }
 .metric { padding: 9px; border-radius: 9px; background: rgba(255,255,255,.025); }
 .metric span { color: var(--muted-2); font-size: 8px; }
 .metric b { display: block; font-size: 15px; margin: 4px 0 7px; }
@@ -321,7 +321,7 @@ button.primary:hover:not(:disabled) { background: #56e2d5; border-color: #56e2d5
 .decision-bars em { font-style: normal; text-align: right; color: var(--text); }
 .case-regression { margin-top: 14px; overflow: hidden; }
 .case-table { font-size: 9px; }
-.case-head, .case-row { display: grid; grid-template-columns: minmax(260px,1fr) repeat(6,60px) 70px; align-items: center; min-height: 42px; padding: 0 14px; border-bottom: 1px solid var(--line-soft); }
+.case-head, .case-row { display: grid; grid-template-columns: minmax(260px,1fr) repeat(7,60px) 70px; align-items: center; min-height: 42px; padding: 0 14px; border-bottom: 1px solid var(--line-soft); }
 .case-head { color: var(--muted-2); background: #091a23; font-size: 8px; }
 .case-row:hover, .case-row.current { background: rgba(55,214,198,.045); }
 .case-row > span:not(:first-child) { text-align: center; }

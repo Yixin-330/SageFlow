@@ -126,6 +126,7 @@
   "scenarios": [
     {
       "id": "S01",
+      "scope_tags": ["leisure_trip"],
       "title": "雨势逼近，体力接近上限",
       "summary": "强降雨、较高步行量与闭馆压力共同出现，存在高匹配室内替代项。",
       "traveler": {"name": "林予安", "trip": "杭州独行 · 第 2 天", "companions": "独自"},
@@ -140,6 +141,7 @@
     },
     {
       "id": "S02",
+      "scope_tags": ["leisure_trip"],
       "title": "长期偏好遇到今天的明确意图",
       "summary": "外部条件与 S01 接近，但用户明确表示今天体力很好并想继续户外行程。",
       "traveler": {"name": "林予安", "trip": "杭州独行 · 第 2 天", "companions": "独自"},
@@ -152,6 +154,7 @@
     },
     {
       "id": "S03",
+      "scope_tags": ["leisure_trip"],
       "title": "有疲劳迹象，但证据不足",
       "summary": "仅有较高步数，缺少持续活动、速度或用户自述，系统不应武断判断疲劳。",
       "traveler": {"name": "林予安", "trip": "苏州周末 · 第 1 天", "companions": "独自"},
@@ -164,6 +167,7 @@
     },
     {
       "id": "S04",
+      "scope_tags": ["leisure_trip"],
       "title": "连续忽略后的克制",
       "summary": "天气有变化但紧迫性不高，用户已连续忽略两次低价值提醒。",
       "traveler": {"name": "林予安", "trip": "杭州独行 · 第 2 天", "companions": "独自"},
@@ -176,6 +180,7 @@
     },
     {
       "id": "S05",
+      "scope_tags": ["leisure_trip"],
       "title": "亲子同行的休息窗口",
       "summary": "孩子临近固定休息时间，继续跨区移动会显著增加同行负担。",
       "traveler": {"name": "周然", "trip": "暖泉古镇亲子行 · 半日", "companions": "6 岁儿童"},
@@ -188,6 +193,7 @@
     },
     {
       "id": "S06",
+      "scope_tags": ["leisure_trip", "city_break"],
       "title": "高匹配推荐超出预算",
       "summary": "摄影体验高度匹配，但临时票价明显超出用户单项活动舒适预算。",
       "traveler": {"name": "林予安", "trip": "上海城市短途 · 第 1 天", "companions": "独自"},
@@ -200,6 +206,7 @@
     },
     {
       "id": "S07",
+      "scope_tags": ["leisure_trip", "city_break"],
       "title": "两条节奏记忆发生冲突",
       "summary": "不同旅行情境留下相反节奏证据，当前情境不足以确定哪条更适用。",
       "traveler": {"name": "林予安", "trip": "南京周末 · 第 1 天", "companions": "朋友"},
@@ -212,6 +219,7 @@
     },
     {
       "id": "S08",
+      "scope_tags": ["leisure_trip"],
       "title": "延迟到达的过期天气",
       "summary": "强降雨事件晚到三小时，当前已经雨停，过期数据不应触发调整。",
       "traveler": {"name": "林予安", "trip": "杭州独行 · 第 2 天", "companions": "独自"},

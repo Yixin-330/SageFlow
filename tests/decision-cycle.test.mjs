@@ -59,3 +59,40 @@ test("matched user service rule suppresses a nonurgent intervention but not a hi
   const high = await runCycle(highScenario, { extraMemories: [rule] });
   assert.equal(high.modes.sageflow.selected_action.action_type, "propose_itinerary_adjustment");
 });
+
+test("decision context separates memory layers and remains silent on mandatory overflow", async () => {
+  const scenario = catalog.scenarios.find((item) => item.id === "S01");
+  const normal = await runCycle(scenario);
+  assert.ok(normal.decisionContext.long_term.length > 0);
+  assert.equal(normal.decisionContext.complete, true);
+  const source = catalog.memory_catalog.find((item) => item.memory_id === "mem_photography");
+  const commitments = Array.from({ length: 9 }, (_, index) => ({ ...structuredClone(source),
+    memory_id: `mem_commit_${index}`, memory_tier: "short_term", service_role: "commitment",
+    statement: { subject: "user", predicate: `trip_choice_${index}`, value: `choice_${index}` },
+    scope: { domain: "travel", trips: ["trip_hangzhou_001"] } }));
+  const { decisionContext, recall, modes } = await runCycle(scenario, { extraMemories: commitments });
+  assert.equal(decisionContext.trace_id, recall.trace_id);
+  assert.ok(decisionContext.current_trip.length > 0);
+  assert.equal(decisionContext.complete, false);
+  assert.equal(decisionContext.mandatory_overflow_count, 2);
+  assert.equal(modes.sageflow.selected_action.action_type, "remain_silent");
+  assert.ok(modes.sageflow.selected_action.reason_codes.includes("MANDATORY_EVIDENCE_OVERFLOW"));
+});
+
+test("decision cycle stays silent when a mandatory constraint cannot be scoped", async () => {
+  const scenario = catalog.scenarios.find((item) => item.id === "S01");
+  const source = catalog.memory_catalog.find((item) => item.memory_id === "mem_photography");
+  const unresolved = { ...structuredClone(source), memory_id: "mem_health_unresolved",
+    memory_domain: "user", memory_kind: "semantic",
+    statement: { subject: "user", predicate: "health_constraint", value: "avoid_heat" },
+    scope: { domain: "travel", situations: [{ field: "health_profile", value: "heat_sensitive" }] },
+    sensitivity: "normal" };
+  const { decisionContext, recall, modes } = await runCycle(scenario, { extraMemories: [unresolved] });
+
+  assert.equal(decisionContext.complete, false);
+  assert.equal(decisionContext.unavailable_mandatory_count, 1);
+  assert.ok(recall.trace.unavailable_mandatory.some((item) => item.memory_id === "mem_health_unresolved"
+    && item.reason_code === "SCOPE_UNRESOLVED"));
+  assert.equal(modes.sageflow.selected_action.action_type, "remain_silent");
+  assert.ok(modes.sageflow.selected_action.reason_codes.includes("MANDATORY_EVIDENCE_UNAVAILABLE"));
+});

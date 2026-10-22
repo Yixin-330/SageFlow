@@ -11,5 +11,6 @@ test("stage-six integrated evaluation passes scenarios and counterfactuals", asy
   assert.equal(report.metrics.counterfactual_pass, 2);
   assert.equal(report.metrics.silence_accuracy, 1);
   assert.equal(report.metrics.trace_coverage, 1);
+  assert.equal(report.metrics.audit_coverage, 1);
   assert.equal(report.metrics.feedback_safety, 1);
 });

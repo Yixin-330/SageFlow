@@ -1,0 +1,14 @@
+{
+  "suite_version": "1.0",
+  "disclaimer": "人工设计的确定性困难情境，用于防回归，不代表真实用户分布。",
+  "cases": [
+    {"id":"X01","base_scenario_id":"S01","title":"缺失位置权限","context_patch":{"permissions":false},"expected_action":"ask_permission","forbidden_actions":["propose_itinerary_adjustment"]},
+    {"id":"X02","base_scenario_id":"S01","title":"天气已经过期","context_patch":{"weatherFreshnessMinutes":180,"receivedStaleWeather":true},"expected_action":"remain_silent","expected_state":{"data_freshness":"stale"},"forbidden_actions":["propose_itinerary_adjustment"]},
+    {"id":"X03","base_scenario_id":"S06","title":"移除预算记忆","remove_memory_ids":["mem_budget_150"],"expected_action":"remain_silent","must_exclude":["mem_budget_150"],"absent_state":["budget_pressure"]},
+    {"id":"X04","base_scenario_id":"S05","title":"孩子尚未到休息窗口","context_patch":{"childRestDue":false},"expected_action":"remain_silent","absent_state":["companion_need"]},
+    {"id":"X05","base_scenario_id":"S07","title":"冲突记忆只剩一侧","remove_memory_ids":["mem_fast_pace"],"expected_action":"remain_silent","absent_state":["preference_conflict"]},
+    {"id":"X06","base_scenario_id":"S02","title":"不再有明确体力自述","context_patch":{"selfReportedEnergy":null,"currentIntent":null},"expected_action":"propose_itinerary_adjustment","expected_state":{"fatigue":"high"}},
+    {"id":"X07","base_scenario_id":"S06","title":"敏感预算记忆无读取权限","memory_overrides":{"mem_budget_150":{"sensitivity":"sensitive"}},"expected_action":"remain_silent","must_exclude":["mem_budget_150"],"absent_state":["budget_pressure"],"omitted_reason":"SENSITIVE_RECALL_PERMISSION_REQUIRED"},
+    {"id":"X08","base_scenario_id":"S06","title":"敏感预算记忆有明确授权","memory_overrides":{"mem_budget_150":{"sensitivity":"sensitive"}},"permissions":["memory:sensitive:read"],"expected_action":"ask_user_preference","must_include":["mem_budget_150"],"expected_state":{"budget_pressure":"high"}}
+  ]
+}

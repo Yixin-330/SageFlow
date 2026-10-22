@@ -1,0 +1,107 @@
+{
+  "version": "promotion-gate-0.1",
+  "thresholds": {
+    "max_false_promotion_rate_low": 0,
+    "max_false_promotion_rate_high": 0,
+    "max_missed_promotion_rate": 0,
+    "max_duplicate_promotions": 0,
+    "min_provenance_coverage": 1,
+    "min_scope_accuracy": 1
+  },
+  "cases": [
+    {
+      "id": "two_leisure_trips", "expected": { "promote": true, "scope": { "domain": "travel", "situations": [{ "field": "trip_kind", "value": "leisure_trip" }] } },
+      "observations": [
+        { "id": "a1", "day": 1, "trip": "t1", "trip_kind": "leisure_trip", "value": "slow" },
+        { "id": "a2", "day": 10, "trip": "t2", "trip_kind": "leisure_trip", "value": "slow" }
+      ], "replay_last_batch": true
+    },
+    {
+      "id": "one_exhibit_refusal", "expected": { "promote": false },
+      "observations": [{ "id": "b1", "day": 1, "trip": "t1", "trip_kind": "leisure_trip", "predicate": "likes_experience", "value": "photography", "entity": "exhibit_7" }]
+    },
+    {
+      "id": "one_trip_budget_tightening", "expected": { "promote": false },
+      "observations": [{ "id": "c1", "day": 1, "trip": "t1", "trip_kind": "leisure_trip", "predicate": "current_trip_budget_intent", "value": "save" }]
+    },
+    {
+      "id": "same_trip_repetition", "expected": { "promote": false },
+      "observations": [
+        { "id": "d1", "day": 1, "trip": "t1", "trip_kind": "leisure_trip", "value": "slow" },
+        { "id": "d2", "day": 10, "trip": "t1", "trip_kind": "leisure_trip", "value": "slow" }
+      ]
+    },
+    {
+      "id": "same_utterance_duplicate_extraction", "expected": { "promote": false },
+      "observations": [
+        { "id": "e1", "day": 1, "trip": "t1", "trip_kind": "leisure_trip", "value": "slow", "duplicate_candidates": 2 },
+        { "id": "e2", "day": 10, "trip": "t1", "trip_kind": "leisure_trip", "value": "slow", "utterance": "e1" }
+      ]
+    },
+    {
+      "id": "cross_trip_counter_evidence", "expected": { "promote": false, "reason_code": "UNRESOLVED_COUNTER_EVIDENCE" },
+      "observations": [
+        { "id": "f1", "day": 1, "trip": "t1", "trip_kind": "leisure_trip", "value": "slow" },
+        { "id": "f2", "day": 10, "trip": "t2", "trip_kind": "leisure_trip", "value": "slow", "batch": 2 },
+        { "id": "f3", "day": 10, "trip": "t3", "trip_kind": "leisure_trip", "value": "fast", "batch": 2 }
+      ]
+    },
+    {
+      "id": "short_term_expired_before_second_trip", "expected": { "promote": true, "scope": { "domain": "travel", "situations": [{ "field": "trip_kind", "value": "leisure_trip" }] } },
+      "observations": [
+        { "id": "g1", "day": 1, "trip": "t1", "trip_kind": "leisure_trip", "value": "slow" },
+        { "id": "g_end", "day": 2, "trip": "t1", "event_type": "trip.ended" },
+        { "id": "g2", "day": 10, "trip": "t2", "trip_kind": "leisure_trip", "value": "slow" }
+      ]
+    },
+    {
+      "id": "mixed_business_leisure", "expected": { "promote": false },
+      "observations": [
+        { "id": "h1", "day": 1, "trip": "t1", "trip_kind": "business_trip", "value": "slow" },
+        { "id": "h2", "day": 10, "trip": "t2", "trip_kind": "leisure_trip", "value": "slow" }
+      ]
+    },
+    {
+      "id": "low_confidence_pending_noise", "expected": { "promote": false },
+      "observations": [
+        { "id": "i1", "day": 1, "trip": "t1", "trip_kind": "leisure_trip", "value": "slow", "confidence": 0.4 },
+        { "id": "i2", "day": 10, "trip": "t2", "trip_kind": "leisure_trip", "value": "slow" }
+      ]
+    },
+    {
+      "id": "health_requires_confirmation", "expected": { "promote": false, "reason_code": "POLICY_REQUIRES_CONFIRMATION" },
+      "observations": [
+        { "id": "j1", "day": 1, "trip": "t1", "trip_kind": "leisure_trip", "predicate": "health_constraint", "value": "avoid_heat", "sensitivity": "sensitive" },
+        { "id": "j2", "day": 10, "trip": "t2", "trip_kind": "leisure_trip", "predicate": "health_constraint", "value": "avoid_heat", "sensitivity": "sensitive" }
+      ]
+    },
+    {
+      "id": "existing_equivalent_long_term", "expected": { "promote": true, "long_term_count": 1, "reason_code": "REINFORCE_EXISTING_LONG_TERM", "scope": { "domain": "travel", "situations": [{ "field": "trip_kind", "value": "leisure_trip" }] } },
+      "observations": [
+        { "id": "k0", "day": 1, "trip": "t0", "trip_kind": "leisure_trip", "value": "slow", "memory_tier": "long_term", "retention": "long_term_candidate" },
+        { "id": "k1", "day": 1, "trip": "t1", "trip_kind": "leisure_trip", "value": "slow" },
+        { "id": "k2", "day": 10, "trip": "t2", "trip_kind": "leisure_trip", "value": "slow" }
+      ]
+    },
+    {
+      "id": "explicit_global_requires_confirmation", "expected": { "promote": false, "reason_code": "POLICY_REQUIRES_CONFIRMATION" },
+      "observations": [
+        { "id": "m1", "day": 1, "trip": "t1", "value": "slow", "explicit_generalization": true },
+        { "id": "m2", "day": 10, "trip": "t2", "value": "slow", "explicit_generalization": true }
+      ]
+    },
+    {
+      "id": "post_promotion_correction", "expected": { "promote": true, "corrected_after_promotion": true, "scope": { "domain": "travel", "situations": [{ "field": "trip_kind", "value": "leisure_trip" }] } },
+      "observations": [
+        { "id": "n1", "day": 1, "trip": "t1", "trip_kind": "leisure_trip", "value": "slow" },
+        { "id": "n2", "day": 10, "trip": "t2", "trip_kind": "leisure_trip", "value": "slow" },
+        { "id": "n3", "day": 20, "trip": "t3", "trip_kind": "leisure_trip", "value": "fast", "event_type": "feedback.user_corrected", "evidence_kind": "user_correction", "memory_tier": "long_term", "retention": "long_term_candidate" }
+      ]
+    },
+    {
+      "id": "observation_window_expires", "expected": { "promote": false, "expired_groups": 1 },
+      "observations": [{ "id": "l1", "day": 1, "trip": "t1", "trip_kind": "leisure_trip", "value": "slow", "confidence": 0.4 }],
+      "sweep_at_day": 100
+    }
+  ]
+}

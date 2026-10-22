@@ -1,8 +1,11 @@
 import { normalizeMemory } from "./memory-model.mjs";
+import { evaluateScope } from "./scope.mjs";
 
 const RRF_K = 60;
 const CONSTRAINT = /budget|allerg|health_constraint|accessibility|safety|permission|must_avoid|constraint|预算|过敏|禁忌|无障碍/i;
 const SERVICE = /notification_frequency|interrupt|提醒频率|打扰/i;
+const MANDATORY_CAP = 8;
+const BLOCKING_MANDATORY_REASONS = new Set(["SCOPE_UNRESOLVED", "SENSITIVE_RECALL_PERMISSION_REQUIRED"]);
 
 export function memoryText(memory) {
   return [memory.label, memory.statement?.subject, memory.statement?.predicate,
@@ -18,18 +21,7 @@ function termsOf(text) {
   return [...new Set([...latin, ...chinese])];
 }
 
-function applicability(memory, request) {
-  const scopes = memory.scope?.applies_when ?? [];
-  if (!scopes.length) return { allowed: true, label: "global", score: 0.8 };
-  if (request.trip_id && scopes.includes(request.trip_id)) return { allowed: true, label: "current_trip", score: 1 };
-  const situation = request.situation ?? {};
-  if (scopes.some((scope) => Object.values(situation).includes(scope) || situation[scope] === true)) {
-    return { allowed: true, label: "matched_situation", score: 0.9 };
-  }
-  const tripScoped = scopes.some((scope) => scope.startsWith("trip_"));
-  if (!tripScoped && !situation.trip_kind) return { allowed: true, label: "unresolved_scope", score: 0.55 };
-  return { allowed: false, label: "out_of_scope", score: 0 };
-}
+const applicability = (memory, request, now) => evaluateScope(memory.scope, request, now);
 
 function ruleMatches(memory, situation = {}) {
   const conditions = memory.conditions ?? memory.statement?.value?.conditions;
@@ -123,13 +115,26 @@ function proceduralChannel(eligible, request) {
     .map(({ memory }) => ({ memory, score: memory.confidence ?? 0.5 })), "procedural");
 }
 
+function tripChannel(eligible, request) {
+  if (!request.trip_id) return [];
+  return ranked(eligible.filter(({ memory }) => memory.memory_tier === "short_term"
+    && (memory.scope?.trips ?? memory.scope?.applies_when ?? []).includes(request.trip_id))
+    .map(({ memory }) => ({ memory, score: (memory.salience ?? 0.5) + 0.1 })), "trip");
+}
+
+function isMandatory(memory, request) {
+  if ((request.required_memory_ids ?? []).includes(memory.memory_id)) return true;
+  if (request.purpose !== "decision") return false;
+  if (["hard_constraint", "commitment"].includes(memory.service_role)) return true;
+  if (memory.memory_kind === "procedural" && ruleMatches(memory, request.situation)) return true;
+  const predicate = memory.statement?.predicate ?? "";
+  return CONSTRAINT.test(predicate) || SERVICE.test(predicate);
+}
+
 function requiredIds(eligible, request, conflicts) {
-  const ids = new Set(request.required_memory_ids ?? []);
+  const ids = new Set();
   for (const { memory } of eligible) {
-    const predicate = memory.statement?.predicate ?? "";
-    if (request.purpose === "decision" && (CONSTRAINT.test(predicate) || SERVICE.test(predicate))) ids.add(memory.memory_id);
-    if (memory.memory_tier === "short_term" && request.trip_id
-      && memory.scope?.applies_when?.includes(request.trip_id)) ids.add(memory.memory_id);
+    if (isMandatory(memory, request)) ids.add(memory.memory_id);
   }
   const eligibleIds = new Set(eligible.map(({ memory }) => memory.memory_id));
   for (const conflict of conflicts) {
@@ -149,6 +154,38 @@ function safeRelations(edges, selectedIds, visibleIds) {
   });
 }
 
+export function validateStateSnapshot(state, request, now) {
+  if (!state) return { state: null, status: "NOT_PROVIDED" };
+  const required = ["state_id", "user_id", "trip_id", "observed_at", "expires_at", "model_version"];
+  if (required.some((field) => !state[field]) || !state.dimensions || typeof state.dimensions !== "object") {
+    return { state: null, status: "INVALID_STATE" };
+  }
+  if (state.sensitivity && !["normal", "sensitive"].includes(state.sensitivity)) {
+    return { state: null, status: "INVALID_STATE" };
+  }
+  if (state.user_id !== request.user_id || !request.trip_id || state.trip_id !== request.trip_id) {
+    return { state: null, status: "STATE_SCOPE_MISMATCH" };
+  }
+  const observed = Date.parse(state.observed_at);
+  const expires = Date.parse(state.expires_at);
+  const current = Date.parse(now);
+  if (!Number.isFinite(observed) || !Number.isFinite(expires) || observed > current || expires <= current || expires <= observed) {
+    return { state: null, status: "STATE_EXPIRED_OR_INVALID_TIME" };
+  }
+  if (Object.values(state.dimensions).some((dimension) => !dimension || typeof dimension !== "object"
+    || !Object.hasOwn(dimension, "value") || !Number.isFinite(dimension.confidence)
+    || dimension.confidence < 0 || dimension.confidence > 1
+    || !Array.isArray(dimension.evidence_ids) || !dimension.evidence_ids.length)) {
+    return { state: null, status: "STATE_EVIDENCE_REQUIRED" };
+  }
+  const sensitive = state.sensitivity === "sensitive"
+    || Object.values(state.dimensions).some((dimension) => dimension.sensitivity === "sensitive");
+  if (sensitive && !(request.permissions ?? []).includes("state:sensitive:read")) {
+    return { state: null, status: "STATE_SENSITIVE_PERMISSION_REQUIRED" };
+  }
+  return { state, status: "ACCEPTED" };
+}
+
 export function eligibleMemoryIds(memories, request, now) {
   const permissions = new Set(request.permissions ?? []);
   return memories.map(normalizeMemory).filter((memory) => {
@@ -156,7 +193,7 @@ export function eligibleMemoryIds(memories, request, now) {
     if (memory.sensitivity === "sensitive" && !permissions.has("memory:sensitive:read")) return false;
     if (memory.valid_from && Date.parse(memory.valid_from) > Date.parse(now)) return false;
     if (memory.expires_at && Date.parse(memory.expires_at) <= Date.parse(now)) return false;
-    return applicability(memory, request).allowed;
+    return applicability(memory, request, now).allowed;
   }).map((memory) => memory.memory_id);
 }
 
@@ -165,36 +202,55 @@ export async function retrieveMemories({ memories, conflicts = [], edges = [], r
   const permissions = new Set(request.permissions ?? []);
   const omitted = [];
   const eligible = [];
+  const evaluated = [];
   for (const original of memories) {
     const memory = normalizeMemory(original);
-    if (memory.status !== "active") { omitted.push({ memory_id: memory.memory_id, reason_code: "INACTIVE" }); continue; }
-    if (memory.sensitivity === "sensitive" && !permissions.has("memory:sensitive:read")) {
-      omitted.push({ reason_code: "SENSITIVE_RECALL_PERMISSION_REQUIRED" }); continue;
+    let reasonCode = null;
+    let scope = null;
+    if (memory.status !== "active") reasonCode = "INACTIVE";
+    else if (memory.sensitivity === "sensitive" && !permissions.has("memory:sensitive:read")) {
+      reasonCode = "SENSITIVE_RECALL_PERMISSION_REQUIRED";
+    } else if (memory.valid_from && Date.parse(memory.valid_from) > Date.parse(now)) reasonCode = "NOT_YET_VALID";
+    else if (memory.expires_at && Date.parse(memory.expires_at) <= Date.parse(now)) reasonCode = "EXPIRED";
+    else {
+      scope = applicability(memory, request, now);
+      if (!scope.allowed) reasonCode = scope.reason_code;
     }
-    if (memory.valid_from && Date.parse(memory.valid_from) > Date.parse(now)) {
-      omitted.push({ memory_id: memory.memory_id, reason_code: "NOT_YET_VALID" }); continue;
+    evaluated.push({ memory, reasonCode });
+    if (reasonCode) {
+      omitted.push(reasonCode === "SENSITIVE_RECALL_PERMISSION_REQUIRED"
+        ? { reason_code: reasonCode }
+        : { memory_id: memory.memory_id, reason_code: reasonCode });
+    } else {
+      eligible.push({ memory, applicability: scope });
     }
-    if (memory.expires_at && Date.parse(memory.expires_at) <= Date.parse(now)) {
-      omitted.push({ memory_id: memory.memory_id, reason_code: "EXPIRED" }); continue;
-    }
-    const scope = applicability(memory, request);
-    if (!scope.allowed) { omitted.push({ memory_id: memory.memory_id, reason_code: "OUT_OF_SCOPE" }); continue; }
-    eligible.push({ memory, applicability: scope });
   }
+  const unavailableMandatory = evaluated.filter(({ memory, reasonCode }) =>
+    reasonCode && BLOCKING_MANDATORY_REASONS.has(reasonCode) && isMandatory(memory, request))
+    .map(({ memory, reasonCode }) => {
+      if (reasonCode === "SENSITIVE_RECALL_PERMISSION_REQUIRED") return { reason_code: reasonCode };
+      return {
+        memory_id: memory.memory_id,
+        reason_code: reasonCode,
+        predicate: memory.statement?.predicate ?? null,
+        ...(memory.service_role ? { service_role: memory.service_role } : {})
+      };
+    });
 
   const structured = structuredChannel(eligible, request);
   const lexical = architecture === "flat" ? [] : lexicalChannel(eligible, request);
   const semantic = architecture === "flat" || vectorHits.length ? [] : await semanticChannel(eligible, request, embedder);
   const procedural = architecture === "flat" ? [] : proceduralChannel(eligible, request);
+  const trip = tripChannel(eligible, request);
   const allowedMap = new Map(eligible.map(({ memory }) => [memory.memory_id, memory]));
   const external = (hits, channel) => ranked(hits.flatMap((hit) => allowedMap.has(hit.memory_id)
     ? [{ memory: allowedMap.get(hit.memory_id), score: Number(hit.score) }] : []), channel);
   const fullText = architecture === "flat" ? [] : external(fullTextHits, "full_text");
   const vector = architecture === "flat" ? [] : external(vectorHits, "vector");
-  const seedIds = new Set([...structured, ...lexical, ...semantic, ...fullText, ...vector, ...procedural]
+  const seedIds = new Set([...structured, ...lexical, ...semantic, ...fullText, ...vector, ...procedural, ...trip]
     .slice(0, 20).map((item) => item.memory.memory_id));
   const graph = architecture === "hybrid" ? graphChannel(eligible, edges, seedIds) : [];
-  const channels = { structured, lexical, full_text: fullText, semantic, vector, graph, procedural };
+  const channels = { structured, lexical, full_text: fullText, semantic, vector, graph, procedural, trip };
   const mandatory = requiredIds(eligible, request, conflicts);
   const fused = new Map(eligible.map(({ memory, applicability: scope }) => [memory.memory_id, {
     memory,
@@ -226,18 +282,22 @@ export async function retrieveMemories({ memories, conflicts = [], edges = [], r
       + 0.1 * Math.min(1, (item.memory.evidence_event_ids?.length ?? 0) / 3);
     const directRelevance = Math.max(0, ...["lexical", "full_text", "semantic", "vector"]
       .map((channel) => Math.min(1, item.channel_scores[channel] ?? 0)));
-    const score = Number((item.rrf_score * 10 + quality + 0.4 * directRelevance).toFixed(4));
+    const tripBoost = item.memory.memory_tier === "short_term" && item.applicability === "current_trip" ? 0.12 : 0;
+    const score = Number((item.rrf_score * 10 + quality + 0.4 * directRelevance + tripBoost).toFixed(4));
     return {
       ...item,
+      layer: item.memory.memory_tier === "long_term" ? "long_term" : item.applicability === "current_trip" ? "trip" : "short_term",
       score,
       reason_codes: [mandatory.has(item.memory.memory_id) ? "MANDATORY_EVIDENCE" : null,
         ...Object.keys(item.channel_ranks).map((channel) => `RETRIEVED_${channel.toUpperCase()}`)].filter(Boolean),
-      score_breakdown: { rrf: Number(item.rrf_score.toFixed(5)), quality: Number(quality.toFixed(4)), direct_relevance: Number(directRelevance.toFixed(4)) }
+      score_breakdown: { rrf: Number(item.rrf_score.toFixed(5)), quality: Number(quality.toFixed(4)), direct_relevance: Number(directRelevance.toFixed(4)), trip_boost: tripBoost }
     };
   }).sort((a, b) => b.score - a.score || a.memory.memory_id.localeCompare(b.memory.memory_id));
 
   const limit = request.limit ?? 5;
-  const selected = rankedItems.filter((item) => mandatory.has(item.memory.memory_id));
+  const mandatoryRanked = rankedItems.filter((item) => mandatory.has(item.memory.memory_id));
+  const selected = mandatoryRanked.slice(0, Math.max(limit, MANDATORY_CAP));
+  const mandatoryOverflow = mandatoryRanked.slice(selected.length);
   const selectedIds = new Set(selected.map((item) => item.memory.memory_id));
   const quota = { episodic: 2, procedural: 2 };
   const count = { episodic: selected.filter((item) => item.memory.memory_kind === "episodic").length,
@@ -257,26 +317,40 @@ export async function retrieveMemories({ memories, conflicts = [], edges = [], r
     || permissions.has("memory:sensitive:read")).map((memory) => memory.memory_id));
   const visibleConflicts = conflicts.filter((conflict) => conflict.memory_ids.every((id) => eligibleIds.has(id))
     && conflict.memory_ids.some((id) => selectedIds.has(id)));
-  for (const item of rankedItems) {
-    if (!selectedIds.has(item.memory.memory_id)) omitted.push({ memory_id: item.memory.memory_id, reason_code: "RANKED_OUT" });
+  const disputedIds = new Set(visibleConflicts.flatMap((conflict) => conflict.memory_ids));
+  for (const item of selected) {
+    if (!disputedIds.has(item.memory.memory_id)) continue;
+    item.disputed = true;
+    item.reason_codes.push("DISPUTED_MEMORY");
   }
-  const currentState = request.current_state
-    && (!request.current_state.expires_at || Date.parse(request.current_state.expires_at) > Date.parse(now))
-    ? request.current_state : null;
+  for (const item of rankedItems) {
+    if (!selectedIds.has(item.memory.memory_id)) omitted.push({ memory_id: item.memory.memory_id,
+      reason_code: mandatory.has(item.memory.memory_id) ? "MANDATORY_OVERFLOW" : "RANKED_OUT" });
+  }
+  const stateGate = validateStateSnapshot(request.current_state, request, now);
   return {
     memories: selected,
+    long_term_memories: selected.filter((item) => item.layer === "long_term"),
+    trip_memories: selected.filter((item) => item.layer === "trip"),
+    short_term_memories: selected.filter((item) => item.layer === "short_term"),
     mandatory_evidence: selected.filter((item) => mandatory.has(item.memory.memory_id)),
     ranked_memories: selected.filter((item) => !mandatory.has(item.memory.memory_id)),
     matched_rules: selected.filter((item) => item.memory.memory_kind === "procedural" && ruleMatches(item.memory, request.situation))
       .map((item) => ({ memory_id: item.memory.memory_id, service_policy: item.memory.service_policy ?? item.memory.statement?.value?.service_policy })),
-    current_state: currentState,
+    current_state: stateGate.state,
     conflicts: visibleConflicts,
     relations: architecture === "hybrid" ? safeRelations(edges, selectedIds, visibleIds) : [],
     omitted,
+    unavailable_mandatory: unavailableMandatory,
     trace: {
       plan: Object.fromEntries(Object.entries(channels).map(([name, hits]) => [name, hits.length])),
       selected_memory_ids: selected.map((item) => item.memory.memory_id),
       mandatory_memory_ids: selected.filter((item) => mandatory.has(item.memory.memory_id)).map((item) => item.memory.memory_id),
+      mandatory_overflow_count: mandatoryOverflow.length,
+      unavailable_mandatory: unavailableMandatory,
+      unavailable_mandatory_count: unavailableMandatory.length,
+      context_complete: mandatoryOverflow.length === 0 && unavailableMandatory.length === 0,
+      state_status: stateGate.status,
       elapsed_ms: Date.now() - started
     }
   };

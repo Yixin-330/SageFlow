@@ -6,7 +6,7 @@
   "required": ["mutation_id", "operation", "target_memory_id", "evidence_event_ids", "occurred_at"],
   "properties": {
     "mutation_id": {"type": "string"},
-    "operation": {"enum": ["CREATE", "REINFORCE", "WEAKEN", "SUPERSEDE", "SPLIT", "MERGE", "EXPIRE", "FLAG_CONFLICT", "NO_LONG_TERM_CHANGE", "ADJUST_FREQUENCY"]},
+    "operation": {"enum": ["CREATE", "REINFORCE", "WEAKEN", "SUPERSEDE", "SPLIT", "MERGE", "PROMOTE", "EXPIRE", "FORGET", "FLAG_CONFLICT", "NO_LONG_TERM_CHANGE", "ADJUST_FREQUENCY"]},
     "target_memory_id": {"type": ["string", "null"]},
     "evidence_event_ids": {"type": "array", "items": {"type": "string"}},
     "occurred_at": {"type": "string", "format": "date-time"}

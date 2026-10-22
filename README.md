@@ -1,6 +1,6 @@
 # SageFlow 用户智能原型
 
-这个仓库包含一个可回放的“在途半日行程自适应”原型。当前已完成阶段 0–6：三模式决策基线、三维记忆协议、候选路由与暂存、可追溯的记忆关系、PostgreSQL 事务持久化、混合召回，以及召回驱动的状态/决策闭环。
+这个仓库包含一个可回放的“在途半日行程自适应”原型。当前已完成阶段 0–7：三模式决策基线、三维记忆协议、候选路由与暂存、可追溯的记忆关系、PostgreSQL 事务持久化、混合召回、召回驱动的状态/决策闭环，以及离线困难场景、证据审计与人工评测入口。
 
 > 原型边界：当前默认使用确定性本地抽取器和模拟数据，不代表真实用户测试、真实模型能力或真实服务指标。JSON 模型与 PostgreSQL Adapter 已预留，但默认运行不连接外部系统。
 
@@ -24,11 +24,17 @@ npm test
 npm run evaluate:memory
 npm run evaluate:recall
 npm run evaluate:cycle
+npm run evaluate:stress
+npm run evaluate:human
+npm run evaluate:stage7
+npm run evaluate:promotion
 ```
 
 PostgreSQL 配置、迁移和真实数据库集成测试见 [`docs/postgres-persistence.md`](docs/postgres-persistence.md)。
 阶段五检索通道、召回协议及评测边界见 [`docs/hybrid-retrieval.md`](docs/hybrid-retrieval.md)。
 阶段六闭环接入与反事实评测见 [`docs/decision-cycle.md`](docs/decision-cycle.md)。
+阶段七原型门禁和人工评测边界见 [`docs/stage-seven-evaluation.md`](docs/stage-seven-evaluation.md)。
+跨行程记忆晋升的第 5 步门禁与人工 scope 评审见 [`docs/promotion-evaluation.md`](docs/promotion-evaluation.md)。
 
 测试包括：
 
