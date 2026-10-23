@@ -16,10 +16,11 @@ test("all JSON Schema documents are readable and declare required fields", async
     "state-transition.schema.json",
     "decision-context.schema.json",
     "promotion-source.schema.json",
-    "promotion-group.schema.json"
+    "promotion-group.schema.json",
+    "promotion-decision.schema.json"
   ];
   assert.ok(expected.every((name) => files.includes(name)));
-  assert.equal(files.length, 17);
+  assert.equal(files.length, 18);
   for (const file of files) {
     const schema = JSON.parse(await readFile(new URL(file, schemaDir), "utf8"));
     assert.equal(schema.$schema, "https://json-schema.org/draft/2020-12/schema");

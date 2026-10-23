@@ -12,6 +12,7 @@ test("prototype gate passes while pilot readiness remains honestly blocked", asy
     catalog: await readJson("../scenarios/catalog.json"),
     memorySuite: await readJson("../evaluation/memory-cases.json"),
     recallSuite: await readJson("../evaluation/recall-cases.json"),
+    promotionSuite: await readJson("../evaluation/promotion-cases.json"),
     stressSuite: await readJson("../evaluation/stress-cases.json"),
     humanQueue: queue
   });
@@ -19,4 +20,21 @@ test("prototype gate passes while pilot readiness remains honestly blocked", asy
   assert.equal(report.pilot_ready, false);
   assert.ok(report.pilot_blockers.includes("HUMAN_REVIEW_INCOMPLETE"));
   assert.equal(report.results.stress.passed, 8);
+  assert.equal(report.checks.promotion_regression, true);
+  assert.equal(report.results.promotion.deterministic_pass, true);
+});
+
+test("stage-seven gate fails when the promotion suite fails", async () => {
+  const promotionSuite = await readJson("../evaluation/promotion-cases.json");
+  promotionSuite.cases[0].expected.promote = false;
+  const report = await runStageSevenGate({
+    catalog: await readJson("../scenarios/catalog.json"),
+    memorySuite: await readJson("../evaluation/memory-cases.json"),
+    recallSuite: await readJson("../evaluation/recall-cases.json"),
+    promotionSuite,
+    stressSuite: await readJson("../evaluation/stress-cases.json"),
+    humanQueue: queue
+  });
+  assert.equal(report.checks.promotion_regression, false);
+  assert.equal(report.prototype_pass, false);
 });

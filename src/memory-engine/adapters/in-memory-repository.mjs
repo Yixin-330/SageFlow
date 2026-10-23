@@ -15,6 +15,7 @@ export function createInMemoryMemoryRepository(seed = []) {
   const tombstones = new Map();
   const promotionGroups = new Map();
   const promotionResults = new Map();
+  const promotionDecisions = new Map();
 
   for (const memory of memories.values()) {
     for (const eventId of memory.evidence_event_ids ?? []) {
@@ -179,8 +180,22 @@ export function createInMemoryMemoryRepository(seed = []) {
     async recordPromotionResult(record) {
       const key = `${record.user_id}:${record.promotion_key}`;
       if (promotionResults.has(key)) return clone(promotionResults.get(key));
+      if ([...promotionResults.values()].some((item) => item.user_id === record.user_id
+        && item.group_id === record.group_id && item.generation === record.generation)) {
+        throw new Error("Promotion result already exists for this group generation");
+      }
       promotionResults.set(key, clone(record));
       return clone(record);
+    },
+    async recordPromotionDecision(record) {
+      const key = `${record.user_id}:${record.decision_id}`;
+      if (!promotionDecisions.has(key)) promotionDecisions.set(key, clone(record));
+      return clone(promotionDecisions.get(key));
+    },
+    async listPromotionDecisions(userId, groupId) {
+      return clone([...promotionDecisions.values()].filter((item) => item.user_id === userId
+        && (!groupId || item.group_id === groupId)).sort((a, b) =>
+        a.evaluated_at.localeCompare(b.evaluated_at) || a.decision_id.localeCompare(b.decision_id)));
     },
     async upsertPromotionGroup(record) {
       promotionGroups.set(`${record.user_id}:${record.group_id}`, clone(record));
@@ -229,10 +244,18 @@ export function createInMemoryMemoryRepository(seed = []) {
         if (item.user_id === userId && (item.evidence_event_ids ?? item.candidate?.evidence_event_ids ?? [])
           .some((id) => evidence.has(id))) pendingCandidates.delete(key);
       }
+      const removedGroupIds = new Set();
       for (const [key, item] of promotionGroups) {
         if (item.user_id === userId && ((item.evidence_event_ids ?? []).some((id) => evidence.has(id))
           || (item.source_memory_ids ?? []).some((id) => ids.has(id))
-          || ids.has(item.promoted_memory_id))) promotionGroups.delete(key);
+          || ids.has(item.promoted_memory_id))) {
+          promotionGroups.delete(key);
+          removedGroupIds.add(item.group_id);
+        }
+      }
+      for (const [key, item] of promotionDecisions) {
+        if (item.user_id === userId && (removedGroupIds.has(item.group_id)
+          || item.evidence_event_ids.some((id) => evidence.has(id)))) promotionDecisions.delete(key);
       }
       for (const [key, item] of promotionResults) {
         if (item.user_id === userId && (ids.has(item.memory_id)
@@ -253,6 +276,7 @@ export function createInMemoryMemoryRepository(seed = []) {
         pending_candidates: clone([...pendingCandidates.values()]),
         promotion_groups: clone([...promotionGroups.values()]),
         promotion_results: clone([...promotionResults.values()]),
+        promotion_decisions: clone([...promotionDecisions.values()]),
         observation_events: clone([...observationEvents.values()]),
         recall_logs: clone([...recallLogs.values()]),
         tombstones: clone([...tombstones.values()])

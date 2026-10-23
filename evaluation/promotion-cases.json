@@ -86,7 +86,7 @@
     {
       "id": "explicit_global_requires_confirmation", "expected": { "promote": false, "reason_code": "POLICY_REQUIRES_CONFIRMATION" },
       "observations": [
-        { "id": "m1", "day": 1, "trip": "t1", "value": "slow", "explicit_generalization": true },
+        { "id": "m1", "day": 1, "trip": "t1", "value": "slow", "explicit_generalization": true, "memory_tier": "long_term", "retention": "long_term_candidate" },
         { "id": "m2", "day": 10, "trip": "t2", "value": "slow", "explicit_generalization": true }
       ]
     },

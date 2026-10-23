@@ -1,5 +1,6 @@
 import { createHash } from "node:crypto";
 import { predicatePolicy, sameValue, scopeRelation } from "./conflict-semantics.mjs";
+import { promotionScopeRelation } from "./promotion-scope.mjs";
 
 const stable = (value) => JSON.stringify(value && typeof value === "object"
   ? Array.isArray(value) ? value.map((item) => JSON.parse(stable(item)))
@@ -21,7 +22,7 @@ export function commonScope(evidenceScopes) {
 
 export function scopeCoveredBy(sourceScope, targetScope) {
   if (!sourceScope || !targetScope) return false;
-  return ["equal", "b_covers_a"].includes(scopeRelation(sourceScope, targetScope));
+  return ["equal", "b_covers_a"].includes(promotionScopeRelation(sourceScope, targetScope));
 }
 
 function independentEvidence(group, policy) {
@@ -50,7 +51,8 @@ export function promotionKey(group, evidence) {
 // No writes, clocks, repositories, or model calls: replayable and human-reviewable.
 export function decidePromotion({ group, policy, now, counterEvidence = [], existingLongTerm = [] }) {
   const base = { group_id: group.group_id, policy_version: policy.policy_version,
-    target_scope: null, confidence: null, evidence_event_ids: [], evidence_trip_ids: [], promotion_key: null };
+    target_scope: null, confidence: null, evidence_event_ids: [], evidence_trip_ids: [], promotion_key: null,
+    proposal_id: null };
   const result = (action, reason_code, extra = {}) => ({ ...base, action, reason_code, ...extra });
   if (!policy.promotable) return result("rejected_by_policy", "PREDICATE_NOT_PROMOTABLE");
   if (group.status === "promoted") return result("wait", "ALREADY_PROMOTED");
@@ -58,24 +60,33 @@ export function decidePromotion({ group, policy, now, counterEvidence = [], exis
   const scope = commonScope((group.evidence ?? []).map((item) => item.source_scope ?? group.scope_anchor));
   const explicitGlobal = (group.evidence ?? []).length > 0
     && group.evidence.every((item) => (item.source_scope ?? group.scope_anchor).explicit_global === true);
-  if (!scope || (policy.scope_policy === "trip_kind_required" && !explicitGlobal
-    && !scope.situations?.some((item) => item.field === "trip_kind"))) {
+  if (!scope || (policy.scope_policy === "known_situation_required" && !explicitGlobal
+    && !scope.situations?.length)) {
     return result("wait", "SCOPE_NOT_GENERALIZABLE");
   }
   const evidence = independentEvidence(group, policy);
   const trips = [...new Set(evidence.map((item) => item.trip_id))];
-  if (trips.length < policy.min_distinct_trips) return result("wait", "INSUFFICIENT_DISTINCT_TRIPS");
-  const span = (Date.parse(evidence.at(-1).occurred_at) - Date.parse(evidence[0].occurred_at)) / 86_400_000;
-  if (span < policy.min_span_days) return result("wait", "INSUFFICIENT_TIME_SPAN");
+  const explicitFastPath = evidence.length > 0
+    && evidence.every((item) => item.explicit_generalization === true
+      && ["explicit_statement", "user_correction"].includes(item.evidence_kind));
+  if (!explicitFastPath && trips.length < policy.min_distinct_trips) return result("wait", "INSUFFICIENT_DISTINCT_TRIPS");
+  const span = evidence.length > 0
+    ? (Date.parse(evidence.at(-1).occurred_at) - Date.parse(evidence[0].occurred_at)) / 86_400_000 : 0;
+  if (!explicitFastPath && span < policy.min_span_days) return result("wait", "INSUFFICIENT_TIME_SPAN");
   if (predicatePolicy(group.claim.predicate).cardinality === "single"
     && counterEvidence.some((item) => item.value !== undefined && !sameValue(item.value, group.claim.value)
     && ["equal", "overlap", "a_covers_b", "b_covers_a"].includes(scopeRelation(item.scope, scope)))) {
     return result("blocked_by_counter_evidence", "UNRESOLVED_COUNTER_EVIDENCE", { target_scope: scope });
   }
-  const matching = existingLongTerm.filter((item) => item.status === "active"
+  const relevant = existingLongTerm.filter((item) => item.status === "active"
     && item.statement?.subject === group.claim.subject && item.statement?.predicate === group.claim.predicate
     && item.memory_domain === group.memory_domain && item.memory_kind === group.memory_kind
-    && ["equal", "overlap", "a_covers_b", "b_covers_a"].includes(scopeRelation(item.scope, scope)));
+    && item.scope?.domain === scope.domain);
+  const unknown = relevant.find((item) => promotionScopeRelation(item.scope, scope) === "unknown");
+  if (unknown) return result("needs_confirmation", "EXISTING_LONG_TERM_SCOPE_UNKNOWN", { target_scope: scope,
+    existing_memory_id: unknown.memory_id });
+  const matching = relevant.filter((item) => ["equal", "overlap", "a_covers_b", "b_covers_a"]
+    .includes(promotionScopeRelation(item.scope, scope)));
   const different = predicatePolicy(group.claim.predicate).cardinality === "single"
     ? matching.find((item) => !sameValue(item.statement.value, group.claim.value)) : null;
   if (different) return result("needs_confirmation", "EXISTING_LONG_TERM_CONFLICT", { target_scope: scope,
@@ -93,8 +104,14 @@ export function decidePromotion({ group, policy, now, counterEvidence = [], exis
   const fields = { target_scope: scope, confidence, evidence_event_ids: eventIds,
     evidence_trip_ids: trips.sort(), promotion_key: promotionKey(group, evidence),
     ...(equivalent ? { existing_memory_id: equivalent.memory_id } : {}) };
-  if (!policy.auto_promote || policy.requires_confirmation || !scope.situations?.length) {
-    return result("needs_confirmation", "POLICY_REQUIRES_CONFIRMATION", fields);
+  const confirmationRequired = explicitFastPath || !policy.auto_promote || policy.requires_confirmation || !scope.situations?.length;
+  if (confirmationRequired) {
+    const proposalId = `proposal_${fields.promotion_key}`;
+    if (group.confirmation?.proposal_id === proposalId) {
+      return result("promote", equivalent ? "REINFORCE_EXISTING_LONG_TERM" : "USER_CONFIRMED_PROMOTION",
+        { ...fields, proposal_id: proposalId });
+    }
+    return result("needs_confirmation", "POLICY_REQUIRES_CONFIRMATION", { ...fields, proposal_id: proposalId });
   }
   return result("promote", equivalent ? "REINFORCE_EXISTING_LONG_TERM" : "INDEPENDENT_EVIDENCE_MET", fields);
 }

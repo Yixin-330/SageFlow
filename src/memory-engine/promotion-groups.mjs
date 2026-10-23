@@ -1,5 +1,6 @@
 import { createHash } from "node:crypto";
 import { promotionPolicy, PROMOTION_POLICY_VERSION } from "./promotion-policy.mjs";
+import { legacyPromotionSituation } from "./promotion-scope.mjs";
 
 function stable(value) {
   if (Array.isArray(value)) return value.map(stable);
@@ -23,15 +24,23 @@ export function canonicalClaim(candidate) {
 export function promotionScopeAnchor(scope = {}, evidenceEvents = [], explicitGeneralization = false) {
   const first = evidenceEvents[0];
   const situations = [...(scope.situations ?? [])];
-  const legacyTripKind = (scope.applies_when ?? []).find((token) =>
-    ["leisure_trip", "business_trip", "family_trip", "solo_trip"].includes(token));
+  const legacySituations = (scope.applies_when ?? []).map(legacyPromotionSituation).filter(Boolean);
+  for (const item of legacySituations) {
+    if (situations.some((known) => known.field === item.field
+      && JSON.stringify(known.value) !== JSON.stringify(item.value))) {
+      return { domain: scope.domain, ...(scope.topic ? { topic: scope.topic } : {}), situations: [],
+        unresolved_trip_id: first?.trip_id ?? "unknown" };
+    }
+    if (!situations.some((known) => known.field === item.field)) situations.push(item);
+  }
+  const legacyTripKind = legacySituations.find((item) => item.field === "trip_kind")?.value;
   const tripKind = first?.payload?.trip_kind ?? legacyTripKind;
   const assertedKind = situations.find((item) => item.field === "trip_kind");
   if (assertedKind && tripKind && assertedKind.value !== tripKind) return {
     domain: scope.domain, ...(scope.topic ? { topic: scope.topic } : {}), situations: [],
     unresolved_trip_id: first?.trip_id ?? "unknown"
   };
-  if (tripKind && !assertedKind) situations.push({ field: "trip_kind", value: tripKind });
+  if (tripKind && !assertedKind && !explicitGeneralization) situations.push({ field: "trip_kind", value: tripKind });
   situations.sort((a, b) => `${a.field}:${JSON.stringify(stable(a.value))}`
     .localeCompare(`${b.field}:${JSON.stringify(stable(b.value))}`));
   const anchor = { domain: scope.domain, ...(scope.topic ? { topic: scope.topic } : {}), situations };
@@ -57,12 +66,15 @@ export function promotionSource({ candidate, sourceType, sourceId, events, sourc
   const identity = promotionGroupIdentity(userId, candidate, events, sourceScope);
   return { ...identity, user_id: userId, memory_domain: candidate.memory_domain, memory_kind: candidate.memory_kind,
     source_type: sourceType, source_id: sourceId, candidate_id: candidate.candidate_id,
+    sensitivity: candidate.sensitivity, service_role: candidate.service_role ?? null,
     policy_version: PROMOTION_POLICY_VERSION,
     evidence: events.map((event) => ({ event_id: event.event_id,
       occurrence_id: event.payload?.utterance_id ?? event.payload?.interaction_id ?? event.event_id,
       trip_id: event.trip_id, session_id: event.payload?.session_id ?? null,
       occurred_at: event.occurred_at, evidence_kind: candidate.evidence_kind,
-      confidence: candidate.confidence,
+      confidence: candidate.confidence, sensitivity: candidate.sensitivity,
+      service_role: candidate.service_role ?? null,
+      explicit_generalization: candidate.explicit_generalization === true,
       source_scope: promotionScopeAnchor(sourceScope, [event], candidate.explicit_generalization === true),
       source_refs: [{ source_type: sourceType, source_id: sourceId }] })) };
 }
@@ -83,8 +95,15 @@ export function mergePromotionGroup(existing, source, now) {
     policy_version: source.policy_version, created_at: now, first_seen_at: new Date(firstSeen).toISOString(),
     observation_deadline_at: new Date(firstSeen + policy.observation_days * 86_400_000).toISOString(),
     evidence: [], evidence_event_ids: [], candidate_ids: [], pending_ids: [], source_memory_ids: [],
+    sensitivity: policy.risk_tier === "high" ? "sensitive" : "normal", service_role: null,
     trip_ids: [], session_ids: [], counter_evidence: [], last_evaluated_at: null, history: prior
   } : structuredClone(existing);
+  base.policy_version = source.policy_version;
+  if (source.sensitivity === "sensitive" || policy.risk_tier === "high") base.sensitivity = "sensitive";
+  const roleRank = { observation: 0, commitment: 1, hard_constraint: 2 };
+  if (source.service_role && (roleRank[source.service_role] ?? 0) > (roleRank[base.service_role] ?? -1)) {
+    base.service_role = source.service_role;
+  }
   const byEvent = new Map(base.evidence.map((item) => [item.event_id, item]));
   for (const item of source.evidence) {
     const priorEvent = byEvent.get(item.event_id);

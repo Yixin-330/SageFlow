@@ -4,11 +4,14 @@ import { runDecisionCycleEvaluation } from "./decision-cycle-evaluation.mjs";
 import { runStressEvaluation } from "./stress-evaluation.mjs";
 import { evaluateHumanReviews } from "./human-review-evaluation.mjs";
 import { evaluateMemoryLifecycle } from "./memory-engine/lifecycle-evaluation.mjs";
+import { runPromotionGate } from "./memory-engine/promotion-evaluation.mjs";
 
-export async function runStageSevenGate({ catalog, memorySuite, recallSuite, stressSuite, humanQueue, humanReviewSets = [], lifecycleData = {} }) {
-  const [memory, recall, cycle, stress] = await Promise.all([
+export async function runStageSevenGate({ catalog, memorySuite, recallSuite, promotionSuite, stressSuite, humanQueue, humanReviewSets = [], lifecycleData = {} }) {
+  if (!promotionSuite) throw new Error("Stage-seven gate requires promotionSuite");
+  const [memory, recall, promotion, cycle, stress] = await Promise.all([
     runMemoryEvaluation(memorySuite, catalog.memory_catalog),
     runRecallEvaluation(recallSuite, catalog.memory_catalog),
+    runPromotionGate(promotionSuite),
     runDecisionCycleEvaluation(catalog),
     runStressEvaluation(catalog, stressSuite)
   ]);
@@ -17,6 +20,7 @@ export async function runStageSevenGate({ catalog, memorySuite, recallSuite, str
   const hybrid = recall.modes.hybrid.metrics;
   const checks = {
     memory_regression: memory.passed === memory.total,
+    promotion_regression: promotion.deterministic_pass,
     recall_constraints: hybrid.required_misses === 0 && hybrid.forbidden_leaks === 0
       && hybrid.conflict_coverage === 1,
     recall_quality_floor: hybrid.recall_at_k >= 0.9,
@@ -31,6 +35,8 @@ export async function runStageSevenGate({ catalog, memorySuite, recallSuite, str
     checks,
     results: {
       memory: { passed: memory.passed, total: memory.total },
+      promotion: { deterministic_pass: promotion.deterministic_pass, checks: promotion.checks,
+        metrics: promotion.metrics, human: promotion.human },
       recall: hybrid,
       cycle: cycle.metrics,
       stress: { passed: stress.passed, total: stress.total },
@@ -39,6 +45,7 @@ export async function runStageSevenGate({ catalog, memorySuite, recallSuite, str
     },
     pilot_blockers: [
       ...(human.status === "dual_review_complete" ? [] : ["HUMAN_REVIEW_INCOMPLETE"]),
+      ...(promotion.human.status === "dual_review_complete" ? [] : ["PROMOTION_HUMAN_SCOPE_REVIEW_INCOMPLETE"]),
       "REAL_DATABASE_AND_SERVICE_NOT_VERIFIED",
       "REAL_USER_OUTCOMES_NOT_MEASURED",
       ...(lifecycle.sample_sizes.labeled_conflicts && lifecycle.sample_sizes.labeled_promotions

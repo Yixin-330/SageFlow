@@ -74,7 +74,7 @@ recall(RecallRequest) -> mandatory_evidence + ranked_memories + matched_rules + 
 
 ## 晋升候选池
 
-第 0–5 步见[晋升候选池说明](../promotion-pool.md)：Pending 与已生效短期记忆按稳定 group ID 收集；满足共同 scope 和独立证据门槛的低风险组可原子晋升，保留原短期记忆及来源谱系。观察到期由独立任务执行；模拟评测门禁已建立，用户确认交互和真实用户验证仍待完成。
+第 0–5 步见[晋升候选池说明](../promotion-pool.md)：Pending 与已生效短期记忆按稳定 group ID 收集；满足共同 scope 和独立证据门槛的低风险组可原子晋升，保留原短期记忆及来源谱系。已知 legacy `applies_when` token 映射为结构化 situation；无法比较的既有长期范围须待确认，session 范围不可跨行程晋升。每次判定和独立任务过期均写入可查询的 Promotion Decision；观察到期由独立任务执行，晋升模拟评测已纳入阶段七主门禁。需确认的晋升组输出 `proposal_id`；用户确认通过 `feedback.user_confirmed` 事件的 `payload.promotion_group_id` 与 `payload.proposal_id` 回传，不接受无 proposal 的泛化确认。确认页面与真实用户验证仍待完成。
 
 ## 架构模式
 

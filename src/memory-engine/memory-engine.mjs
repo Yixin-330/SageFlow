@@ -4,6 +4,7 @@ import { conflictRelation, sameSubjectPredicate, sameValue, scopeRelation, valid
 import { canCollectPromotionSource, promotionPolicy } from "./promotion-policy.mjs";
 import { mergePromotionGroup, promotionGroupIdentity, promotionSource } from "./promotion-groups.mjs";
 import { decidePromotion, commonScope } from "./promotion-decision.mjs";
+import { promotionDecisionRecord } from "./promotion-audit.mjs";
 
 const TRANSACTION_ACTIVE = Symbol("memory-transaction-active");
 
@@ -153,6 +154,11 @@ export function createMemoryEngine({ repository, extractor, embedder, architectu
           extractor, embedder, architecture, clock }).expirePromotionGroups({ now, limit }));
       }
       const groups = await repository.expirePromotionGroups(now, limit);
+      if (repository.recordPromotionDecision) for (const group of groups) {
+        const decision = { action: "expire", reason_code: "OBSERVATION_WINDOW_EXPIRED",
+          policy_version: group.policy_version, target_scope: null, promotion_key: null };
+        await repository.recordPromotionDecision(promotionDecisionRecord(group, decision, now));
+      }
       const pending = repository.expirePendingCandidates ? await repository.expirePendingCandidates(now, limit) : [];
       return { groups, pending };
     },
@@ -197,7 +203,7 @@ export function createMemoryEngine({ repository, extractor, embedder, architectu
           if ((group.source_memory_ids ?? []).some((id) => forgottenIds.has(id))
             || forgottenIds.has(group.promoted_memory_id)
             || (group.evidence_event_ids ?? []).some((id) => evidenceIds.has(id))) {
-            for (const id of group.evidence_event_ids ?? []) {
+            for (const id of [...(group.evidence_event_ids ?? []), group.confirmation?.event_id].filter(Boolean)) {
               if (!evidenceIds.has(id) && !retainedEvidenceIds.has(id)) {
                 evidenceIds.add(id); expanded = true;
               }
@@ -241,7 +247,9 @@ export function createMemoryEngine({ repository, extractor, embedder, architectu
       const insertedIds = new Set(ingestion.inserted_event_ids);
       const acceptedEvents = events.filter((item) => insertedIds.has(item.event_id));
       const eventMap = new Map(acceptedEvents.map((item) => [item.event_id, item]));
-      const extracted = await extractor.extract(acceptedEvents);
+      const confirmationEvents = acceptedEvents.filter((item) => item.event_type === "feedback.user_confirmed"
+        && item.payload?.promotion_group_id);
+      const extracted = await extractor.extract(acceptedEvents.filter((item) => !confirmationEvents.includes(item)));
       if (repository.lockPromotionGroup) {
         const keys = new Map();
         const claimKeys = new Map();
@@ -258,6 +266,14 @@ export function createMemoryEngine({ repository, extractor, embedder, architectu
           const claimKey = `${identity.claim.subject}:${routed.candidate.memory_domain}:${routed.candidate.memory_kind}:${identity.claim.predicate}`;
           claimKeys.set(`${userId}\u0000${claimKey}`, { userId, claimKey });
         }
+        for (const confirmation of confirmationEvents) {
+          const groupId = confirmation.payload.promotion_group_id;
+          const group = await repository.getPromotionGroup?.(confirmation.user_id, groupId);
+          if (!group) continue;
+          keys.set(`${confirmation.user_id}\u0000${groupId}`, { userId: confirmation.user_id, groupId });
+          const claimKey = `${group.claim.subject}:${group.memory_domain}:${group.memory_kind}:${group.claim.predicate}`;
+          claimKeys.set(`${confirmation.user_id}\u0000${claimKey}`, { userId: confirmation.user_id, claimKey });
+        }
         if (repository.lockPromotionClaim) for (const key of [...claimKeys.keys()].sort()) {
           const { userId, claimKey } = claimKeys.get(key);
           await repository.lockPromotionClaim(userId, claimKey);
@@ -273,11 +289,13 @@ export function createMemoryEngine({ repository, extractor, embedder, architectu
       const pending = [];
       const promotionSources = [];
       const storedShortTerm = [];
+      const admissionDecisions = [];
 
       for (const extractedCandidate of extracted) {
         const evidenceEvents = extractedCandidate.evidence_event_ids.map((id) => eventMap.get(id)).filter(Boolean);
         const routed = routeCandidate(extractedCandidate, evidenceEvents);
         const candidate = routed.candidate;
+        if (routed.admission?.policy?.risk_tier === "high") candidate.sensitivity = "sensitive";
         const sourceScope = clone(candidate.scope);
         candidate.user_id ??= eventMap.get(candidate.evidence_event_ids[0])?.user_id;
         candidate.extractor = { name: extractor.name, version: extractor.version };
@@ -306,6 +324,18 @@ export function createMemoryEngine({ repository, extractor, embedder, architectu
         }
         if (routed.disposition === "reject") {
           rejections.push({ candidate_id: candidate.candidate_id, reason_code: routed.reason_code });
+          if (routed.reason_code === "DIRECT_LONG_TERM_NOT_ALLOWED" && repository.recordPromotionDecision) {
+            const identity = promotionGroupIdentity(candidate.user_id, candidate, evidenceEvents, sourceScope);
+            const existingGroup = await repository.getPromotionGroup?.(candidate.user_id, identity.group_id);
+            const group = { user_id: candidate.user_id, group_id: identity.group_id,
+              generation: existingGroup?.generation ?? 1, evidence_event_ids: candidate.evidence_event_ids };
+            const decision = { action: "rejected_by_policy", reason_code: routed.reason_code,
+              policy_version: routed.admission.policy.policy_version, target_scope: null, promotion_key: null,
+              group_id: identity.group_id };
+            const record = promotionDecisionRecord(group, decision, now);
+            await repository.recordPromotionDecision(record);
+            admissionDecisions.push({ ...decision, decision_id: record.decision_id });
+          }
           continue;
         }
         if (!validPredicateValue(candidate.statement?.predicate, candidate.statement?.value)) {
@@ -551,8 +581,27 @@ export function createMemoryEngine({ repository, extractor, embedder, architectu
         await repository.upsertPromotionGroup(group);
         affectedGroups.set(group.group_id, group);
       }
+      for (const confirmation of confirmationEvents) {
+        const group = affectedGroups.get(confirmation.payload.promotion_group_id)
+          ?? await repository.getPromotionGroup?.(confirmation.user_id, confirmation.payload.promotion_group_id);
+        const valid = group?.user_id === confirmation.user_id && group.status === "needs_confirmation"
+          && group.proposal_id && group.proposal_id === confirmation.payload.proposal_id
+          && confirmation.source?.type === "user"
+          && Date.parse(confirmation.occurred_at) >= Date.parse(group.proposal_issued_at)
+          && Date.parse(confirmation.occurred_at) <= Date.parse(now)
+          && Date.parse(group.observation_deadline_at) > Date.parse(now)
+          && (group.sensitivity !== "sensitive" || permissions.has("memory:sensitive:write"));
+        if (!valid) {
+          rejections.push({ event_id: confirmation.event_id, reason_code: "PROMOTION_CONFIRMATION_INVALID" });
+          continue;
+        }
+        group.confirmation = { event_id: confirmation.event_id, proposal_id: confirmation.payload.proposal_id,
+          confirmed_at: confirmation.occurred_at };
+        await repository.upsertPromotionGroup(group);
+        affectedGroups.set(group.group_id, group);
+      }
 
-      const promotionDecisions = [];
+      const promotionDecisions = [...admissionDecisions];
       // The complete batch has already settled corrections and same-tier conflicts here.
       for (const group of affectedGroups.values()) {
         const peers = repository.listPromotionGroupsByClaim
@@ -567,11 +616,22 @@ export function createMemoryEngine({ repository, extractor, embedder, architectu
             return scope ? [{ value: item.claim.value, scope, group_id: item.group_id }] : [];
           });
         const longTerm = (await repository.listByUser(group.user_id)).filter((item) => item.memory_tier === "long_term");
-        const decision = decidePromotion({ group, policy: promotionPolicy(group.claim.predicate), now,
+        let decision = decidePromotion({ group, policy: promotionPolicy(group.claim.predicate), now,
           counterEvidence, existingLongTerm: longTerm });
+        if (decision.action === "promote" && group.sensitivity === "sensitive"
+          && !permissions.has("memory:sensitive:write")) {
+          decision = { ...decision, action: "wait", reason_code: "SENSITIVE_STORAGE_PERMISSION_REQUIRED" };
+        }
         promotionDecisions.push(decision);
         group.last_evaluated_at = now;
         group.status_reason = decision.reason_code;
+        if (decision.action === "needs_confirmation" && decision.proposal_id) {
+          if (group.proposal_id !== decision.proposal_id) {
+            group.proposal_id = decision.proposal_id;
+            group.proposal_issued_at = now;
+            group.confirmation = null;
+          }
+        }
         if (decision.action === "promote") {
           const priorResult = repository.getPromotionResult
             ? await repository.getPromotionResult(group.user_id, decision.promotion_key) : null;
@@ -579,23 +639,31 @@ export function createMemoryEngine({ repository, extractor, embedder, architectu
             group.status = "promoted";
             group.promoted_memory_id = priorResult.memory_id;
           } else {
+            const promotionEvidenceIds = [...new Set([...decision.evidence_event_ids,
+              ...(group.confirmation ? [group.confirmation.event_id] : [])])].sort();
             const candidate = { candidate_id: decision.promotion_key, user_id: group.user_id,
               memory_tier: "long_term", memory_domain: group.memory_domain, memory_kind: group.memory_kind,
               statement: group.claim, scope: decision.target_scope, confidence: decision.confidence,
-              salience: 0.7, evidence_event_ids: decision.evidence_event_ids,
-              retention: "long_term_candidate", sensitivity: "normal",
+              salience: 0.7, evidence_event_ids: promotionEvidenceIds,
+              retention: "long_term_candidate", sensitivity: group.sensitivity ?? "normal",
+              ...(group.service_role ? { service_role: group.service_role } : {}),
               extractor: { name: "promotion-policy", version: group.policy_version } };
             const existing = decision.existing_memory_id
               ? longTerm.find((item) => item.memory_id === decision.existing_memory_id) : null;
             const promoted = existing ? clone(existing) : makeMemory(candidate, eventMap, now);
             if (existing) {
-              promoted.evidence_event_ids = [...new Set([...promoted.evidence_event_ids, ...decision.evidence_event_ids])].sort();
+              if (group.sensitivity === "sensitive") promoted.sensitivity = "sensitive";
+              if (group.service_role === "hard_constraint" || (group.service_role && !promoted.service_role)) {
+                promoted.service_role = group.service_role;
+              }
+              promoted.evidence_event_ids = [...new Set([...promoted.evidence_event_ids, ...promotionEvidenceIds])].sort();
               promoted.evidence_trip_ids = [...new Set([...(promoted.evidence_trip_ids ?? []), ...decision.evidence_trip_ids])].sort();
               promoted.promoted_from = [...new Set([...(promoted.promoted_from ?? []), ...group.source_memory_ids])].sort();
               promoted.promotion_history = [...(promoted.promotion_history ?? []), {
                 promotion_id: decision.promotion_key, promotion_group_id: group.group_id,
                 promotion_policy_version: group.policy_version, promoted_at: now }];
-              promoted.last_confirmed_at = now;
+              promoted.last_confirmed_at = [promoted.last_confirmed_at, group.last_seen_at,
+                group.confirmation?.confirmed_at].filter(Boolean).sort().at(-1);
             } else {
               promoted.memory_id = `mem_${decision.promotion_key}`;
               promoted.lineage_id = promoted.memory_id;
@@ -604,26 +672,31 @@ export function createMemoryEngine({ repository, extractor, embedder, architectu
               promoted.promoted_from = [...group.source_memory_ids];
               promoted.promotion_id = decision.promotion_key;
               promoted.promotion_policy_version = group.policy_version;
+              promoted.promotion_generation = group.generation;
               promoted.evidence_trip_ids = decision.evidence_trip_ids;
               promoted.generalized_scope = clone(decision.target_scope);
               promoted.promoted_at = now;
+              promoted.valid_from = group.first_seen_at;
+              promoted.last_confirmed_at = group.confirmation?.confirmed_at ?? group.last_seen_at;
             }
             await persistMemory(promoted);
-            await saveEvidenceEdges({ ...promoted, evidence_event_ids: decision.evidence_event_ids }, now);
+            await saveEvidenceEdges({ ...promoted, evidence_event_ids: promotionEvidenceIds }, now);
             for (const sourceId of group.source_memory_ids) {
               await saveEdge(edge("PROMOTED_FROM", promoted.memory_id, sourceId, group.user_id, now,
-                decision.evidence_event_ids, { promotion_id: decision.promotion_key }));
+                promotionEvidenceIds, { promotion_id: decision.promotion_key }));
             }
             const record = mutation("PROMOTE", promoted.memory_id, candidate, now, {
               promotion_id: decision.promotion_key, promotion_group_id: group.group_id,
               promotion_policy_version: group.policy_version, reason_code: decision.reason_code,
+              ...(group.confirmation ? { confirmation_event_id: group.confirmation.event_id,
+                proposal_id: group.confirmation.proposal_id } : {}),
               source_memory_ids: [...group.source_memory_ids] });
             record.mutation_id = `mut_${decision.promotion_key}`;
             await repository.appendMutation(record);
             applied.push(record);
             if (repository.recordPromotionResult) await repository.recordPromotionResult({
               user_id: group.user_id, promotion_key: decision.promotion_key, group_id: group.group_id,
-              memory_id: promoted.memory_id, evidence_event_ids: decision.evidence_event_ids,
+              generation: group.generation, memory_id: promoted.memory_id, evidence_event_ids: promotionEvidenceIds,
               evidence_trip_ids: decision.evidence_trip_ids, created_at: now });
             if (repository.listPendingCandidates && repository.appendPendingCandidate && group.pending_ids.length) {
               const activePending = await repository.listPendingCandidates(group.user_id);
@@ -644,6 +717,11 @@ export function createMemoryEngine({ repository, extractor, embedder, architectu
           }
         } else if (["expire", "needs_confirmation", "blocked_by_counter_evidence", "rejected_by_policy"].includes(decision.action)) {
           group.status = decision.action === "expire" ? "expired" : decision.action;
+        }
+        if (repository.recordPromotionDecision) {
+          const record = promotionDecisionRecord(group, decision, now);
+          await repository.recordPromotionDecision(record);
+          decision.decision_id = record.decision_id;
         }
         await repository.upsertPromotionGroup(group);
       }

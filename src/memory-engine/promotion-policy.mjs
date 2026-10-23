@@ -1,4 +1,6 @@
-export const PROMOTION_POLICY_VERSION = "promotion-admission-0.1";
+import { legacyPromotionSituation } from "./promotion-scope.mjs";
+
+export const PROMOTION_POLICY_VERSION = "promotion-admission-0.2";
 
 const DEFAULT = Object.freeze({
   promotable: false, auto_promote: false, risk_tier: "unclassified",
@@ -11,22 +13,22 @@ const DEFAULT = Object.freeze({
 const POLICIES = Object.freeze({
   prefers_travel_pace: { promotable: true, auto_promote: true, risk_tier: "low",
     min_distinct_trips: 2, min_span_days: 7, allowed_evidence_kinds: ["explicit_statement", "observed_behavior", "inference", "user_correction"],
-    requires_confirmation: false, observation_days: 90, scope_policy: "trip_kind_required", direct_long_term: true },
+    requires_confirmation: false, observation_days: 90, scope_policy: "known_situation_required", direct_long_term: true },
   prefers_notification_frequency: { promotable: true, auto_promote: true, risk_tier: "low",
     min_distinct_trips: 2, min_span_days: 7, allowed_evidence_kinds: ["explicit_statement", "observed_behavior", "inference", "user_correction"],
-    requires_confirmation: false, observation_days: 90, scope_policy: "trip_kind_required", direct_long_term: true },
+    requires_confirmation: false, observation_days: 90, scope_policy: "known_situation_required", direct_long_term: true },
   prefers_activity_load: { promotable: true, auto_promote: true, risk_tier: "low",
     min_distinct_trips: 2, min_span_days: 7, allowed_evidence_kinds: ["explicit_statement", "observed_behavior", "inference", "user_correction"],
-    requires_confirmation: false, observation_days: 90, scope_policy: "trip_kind_required", direct_long_term: true },
+    requires_confirmation: false, observation_days: 90, scope_policy: "known_situation_required", direct_long_term: true },
   likes_experience: { promotable: true, auto_promote: true, risk_tier: "low",
     min_distinct_trips: 2, min_span_days: 7, allowed_evidence_kinds: ["explicit_statement", "observed_behavior", "inference", "user_correction"],
-    requires_confirmation: false, observation_days: 90, scope_policy: "trip_kind_required", direct_long_term: true },
+    requires_confirmation: false, observation_days: 90, scope_policy: "known_situation_required", direct_long_term: true },
   comfortable_activity_budget_cny: { promotable: true, auto_promote: false, risk_tier: "medium",
     min_distinct_trips: 2, min_span_days: 7, allowed_evidence_kinds: ["explicit_statement", "user_correction"],
-    requires_confirmation: true, observation_days: 90, scope_policy: "trip_kind_required", direct_long_term: true },
+    requires_confirmation: true, observation_days: 90, scope_policy: "known_situation_required", direct_long_term: true },
   health_constraint: { promotable: true, auto_promote: false, risk_tier: "high",
     min_distinct_trips: 2, min_span_days: 7, allowed_evidence_kinds: ["explicit_statement", "user_correction"],
-    requires_confirmation: true, observation_days: 90, scope_policy: "trip_kind_required", direct_long_term: true },
+    requires_confirmation: true, observation_days: 90, scope_policy: "known_situation_required", direct_long_term: true },
   current_trip_pace: { promotable: false, auto_promote: false, risk_tier: "low", scope_policy: "trip_only" },
   current_trip_budget_intent: { promotable: false, auto_promote: false, risk_tier: "medium", scope_policy: "trip_only" },
   service_policy: { promotable: false, auto_promote: false, risk_tier: "medium", scope_policy: "explicit_only",
@@ -57,6 +59,7 @@ export function classifyAdmission(candidate, evidenceEvents = []) {
   const corrected = candidate.evidence_kind === "user_correction"
     && evidenceEvents.some((event) => event.event_type === "feedback.user_corrected");
   if (explicit && userSourced && policy.direct_long_term && !hasTemporaryScope(candidate.scope, evidenceEvents)
+    && (candidate.explicit_generalization !== true || confirmed)
     && (!policy.requires_confirmation || confirmed || corrected)) {
     return { path: "direct_long_term", reason_code: "EXPLICIT_STABLE_CLAIM", policy };
   }
@@ -67,9 +70,9 @@ export function classifyAdmission(candidate, evidenceEvents = []) {
 
 export function canCollectPromotionSource(candidate, evidenceEvents = [], policy = promotionPolicy(candidate.statement?.predicate)) {
   if (!policy.promotable || !policy.allowed_evidence_kinds.includes(candidate.evidence_kind)) return false;
-  if (candidate.scope?.entities?.length || candidate.scope?.days?.length || candidate.scope?.time_window) return false;
-  const knownTripKinds = new Set(["leisure_trip", "business_trip", "family_trip", "solo_trip"]);
+  if (candidate.scope?.entities?.length || candidate.scope?.days?.length
+    || candidate.scope?.sessions?.length || candidate.scope?.time_window) return false;
   const tripIds = new Set([...(candidate.scope?.trips ?? []), ...evidenceEvents.map((event) => event.trip_id)]);
-  if ((candidate.scope?.applies_when ?? []).some((token) => !knownTripKinds.has(token) && !tripIds.has(token))) return false;
+  if ((candidate.scope?.applies_when ?? []).some((token) => !legacyPromotionSituation(token) && !tripIds.has(token))) return false;
   return true;
 }

@@ -30,6 +30,8 @@ npm run evaluate:stage7
 npm run evaluate:promotion
 ```
 
+`evaluate:stage7` 已包含晋升评测；晋升门禁失败时主原型门禁也会失败。未完成双人晋升 scope 评审仍显示为试点阻塞项。
+
 PostgreSQL 配置、迁移和真实数据库集成测试见 [`docs/postgres-persistence.md`](docs/postgres-persistence.md)。
 阶段五检索通道、召回协议及评测边界见 [`docs/hybrid-retrieval.md`](docs/hybrid-retrieval.md)。
 阶段六闭环接入与反事实评测见 [`docs/decision-cycle.md`](docs/decision-cycle.md)。

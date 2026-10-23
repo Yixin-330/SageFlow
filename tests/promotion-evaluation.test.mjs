@@ -14,7 +14,7 @@ test("promotion gate covers errors, misses, provenance, expiry, correction and s
   assert.equal(report.metrics.duplicate_promotion_count, 0);
   assert.equal(report.metrics.provenance_coverage, 1);
   assert.equal(report.metrics.scope_accuracy, 1);
-  assert.equal(report.metrics.pending_expiry_rate, 0.5);
+  assert.equal(report.metrics.pending_expiry_rate, 0.3333);
   assert.equal(report.metrics.post_promotion_correction_conflict_rate, 0.25);
   assert.equal(report.human.status, "needs_review");
   assert.equal(report.pilot_ready, false);

@@ -223,12 +223,33 @@ function buildRepository(queryable, { transactional = false } = {}) {
     },
     async recordPromotionResult(record) {
       const result = await queryable.query(
-        `INSERT INTO memory_promotion_results (user_id, promotion_key, group_id, memory_id, document)
-         VALUES ($1, $2, $3, $4, $5::jsonb)
+        `INSERT INTO memory_promotion_results (user_id, promotion_key, group_id, generation, memory_id, document)
+         VALUES ($1, $2, $3, $4, $5, $6::jsonb)
          ON CONFLICT (user_id, promotion_key) DO NOTHING RETURNING document`,
-        [record.user_id, record.promotion_key, record.group_id, record.memory_id, json(record)]
+        [record.user_id, record.promotion_key, record.group_id, record.generation, record.memory_id, json(record)]
       );
       return rows(result)[0] ?? repository.getPromotionResult(record.user_id, record.promotion_key);
+    },
+
+    async recordPromotionDecision(record) {
+      await queryable.query(
+        `INSERT INTO memory_promotion_decisions
+          (user_id, decision_id, group_id, generation, action, reason_codes, policy_version,
+           target_scope, evidence_event_ids, evidence_hash, evaluated_at, document)
+         VALUES ($1, $2, $3, $4, $5, $6::text[], $7, $8::jsonb, $9::text[], $10, $11, $12::jsonb)
+         ON CONFLICT (user_id, decision_id) DO NOTHING`,
+        [record.user_id, record.decision_id, record.group_id, record.generation, record.action,
+          record.reason_codes, record.policy_version, record.target_scope ? json(record.target_scope) : null,
+          record.evidence_event_ids, record.evidence_hash, record.evaluated_at, json(record)]
+      );
+      return record;
+    },
+    async listPromotionDecisions(userId, groupId) {
+      return rows(await queryable.query(
+        `SELECT document FROM memory_promotion_decisions WHERE user_id = $1
+         AND ($2::text IS NULL OR group_id = $2) ORDER BY evaluated_at, decision_id`,
+        [userId, groupId ?? null]
+      ));
     },
 
     async upsertPromotionGroup(record) {
@@ -305,6 +326,14 @@ function buildRepository(queryable, { transactional = false } = {}) {
         `DELETE FROM memory_pending_candidates WHERE user_id = $1 AND
           ((document->'evidence_event_ids') ?| $2::text[] OR (document->'candidate'->'evidence_event_ids') ?| $2::text[])`,
         [userId, evidenceEventIds]
+      );
+      await queryable.query(
+        `DELETE FROM memory_promotion_decisions WHERE user_id = $1 AND
+          ((evidence_event_ids && $3::text[]) OR group_id IN (
+            SELECT group_id FROM memory_promotion_groups WHERE user_id = $1 AND
+              ((document->'source_memory_ids') ?| $2::text[] OR (document->'evidence_event_ids') ?| $3::text[]
+                OR document->>'promoted_memory_id' = ANY($2::text[]))))`,
+        [userId, memoryIds, evidenceEventIds]
       );
       await queryable.query(
         `DELETE FROM memory_promotion_groups WHERE user_id = $1 AND

@@ -23,11 +23,11 @@
 可用 `npm run evaluate:memory` 独立运行记忆回归；`npm test` 还覆盖架构模式、路由、Pending、状态隔离、关系边与版本谱系。
 可用 `npm run evaluate:recall` 比较 `flat` / `typed` / `hybrid` 的同一组固定检索样例。该样例集很小，指标只用于回归，不能当作真实用户召回率或统计显著的模式优劣结论。
 可用 `npm run evaluate:cycle` 运行阶段六端到端回放；页面评测面板也显示该闭环报告。
-可用 `npm run evaluate:stage7` 汇总当前原型门禁。它会同时报告试点阻塞项；原型通过不代表真实用户试点就绪。
+可用 `npm run evaluate:stage7` 汇总当前原型门禁，包含 `evaluation/promotion-cases.json` 的晋升门禁；晋升确定性评测失败会让主门禁失败。它会同时报告试点阻塞项；原型通过不代表真实用户试点就绪。
 
 生命周期评测现可由 `evaluateMemoryLifecycle` 接收记忆、召回日志、冲突、Pending、mutation 与人工标签，计算过期短期记忆误召回率、冲突误报率与平均关闭时长、Pending 晋升/过期率、误晋升率和置信度 Brier 分数。未提供分母或人工标签的指标返回 `null`（未测量），绝不算作零错误。阶段七报告保留 `LIFECYCLE_LABELS_NOT_MEASURED` 试点阻塞项；当前没有真实晋升标注，不能声称晋升准确率已验证。
 
-晋升机制第 0–5 步的独立门禁见[晋升评测说明](promotion-evaluation.md)。`npm run evaluate:promotion` 基于模拟金标报告误晋升、漏晋升、Pending 过期、平均停留、晋升后纠正/冲突、幂等、来源和 scope 指标。模拟指标不能代替双人独立人工 scope 评审或真实用户测量。
+晋升机制第 0–5 步的专项门禁见[晋升评测说明](promotion-evaluation.md)。`npm run evaluate:promotion` 基于模拟金标报告误晋升、漏晋升、Pending 过期、平均停留、晋升后纠正/冲突、幂等、来源和 scope 指标；相同 suite 也纳入 `evaluate:stage7`。模拟指标不能代替双人独立人工 scope 评审或真实用户测量。
 
 ## 阶段门禁
 

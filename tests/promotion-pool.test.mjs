@@ -20,6 +20,7 @@ test("admission policy separates direct long-term, confirmation and non-promotab
   assert.equal(promotionPolicy("current_trip_budget_intent").promotable, false);
   const longTerm = { ...candidate("lt", "e1"), memory_tier: "long_term", retention: "long_term_candidate" };
   assert.equal(classifyAdmission(longTerm, [first]).path, "direct_long_term");
+  assert.equal(classifyAdmission({ ...longTerm, explicit_generalization: true }, [first]).path, "promotion_group");
   assert.equal(classifyAdmission({ ...longTerm, evidence_kind: "observed_behavior" }, [first]).path, "promotion_group");
   assert.equal(classifyAdmission({ ...longTerm,
     statement: { subject: "user", predicate: "health_constraint", value: "needs_rest" } }, [first]).path, "promotion_group");
@@ -40,6 +41,73 @@ test("an unconfirmed health constraint remains usable for this trip but does not
   assert.equal(result.memories[0].memory_tier, "short_term");
   assert.deepEqual(result.memories[0].scope.trips, ["trip_1"]);
   assert.equal(result.promotion_groups[0].status, "collecting");
+});
+
+test("a sensitive health proposal requires matching user confirmation and preserves provenance", async () => {
+  let now = "2026-01-01T00:00:00Z";
+  const repository = createInMemoryMemoryRepository();
+  const health = (id, eventId) => candidate(id, eventId, 0.9, {
+    memory_tier: "long_term", retention: "long_term_candidate", sensitivity: "normal",
+    service_role: "hard_constraint", statement: { subject: "user", predicate: "health_constraint", value: "avoid_heat" },
+    scope: { domain: "travel", topic: "health" }
+  });
+  const engine = createMemoryEngine({ repository, clock: { now: () => now },
+    extractor: createScriptedExtractor({ e1: [health("h1", "e1")], e2: [health("h2", "e2")] }) });
+  const permissions = ["memory:sensitive:write"];
+  const e1 = event("e1", "t1", now, { trip_kind: "leisure_trip" });
+  const rejected = await engine.observe([e1]);
+  assert.equal(rejected.rejections[0].reason_code, "SENSITIVE_STORAGE_PERMISSION_REQUIRED");
+  now = "2026-01-10T00:00:00Z";
+  // A rejected event is immutable; use fresh evidence for the confirmation flow.
+  const first = event("e1a", "t1", now, { trip_kind: "leisure_trip" });
+  const second = event("e2", "t2", "2026-01-20T00:00:00Z", { trip_kind: "leisure_trip" });
+  const activeEngine = createMemoryEngine({ repository, clock: { now: () => now },
+    extractor: createScriptedExtractor({ e1a: [health("h1a", "e1a")], e2: [health("h2", "e2")] }) });
+  await activeEngine.observe([first], { permissions });
+  now = second.occurred_at;
+  const proposed = await activeEngine.observe([second], { permissions });
+  const group = proposed.promotion_groups[0];
+  assert.equal(group.status, "needs_confirmation");
+  assert.equal(group.sensitivity, "sensitive");
+  assert.ok(group.proposal_id);
+  const confirmation = { ...event("confirm", "t2", now), event_type: "feedback.user_confirmed",
+    payload: { promotion_group_id: group.group_id, proposal_id: group.proposal_id } };
+  const wrong = await activeEngine.observe([{ ...confirmation, event_id: "wrong",
+    payload: { ...confirmation.payload, proposal_id: "wrong" } }], { permissions });
+  assert.equal(wrong.memories.filter((item) => item.memory_tier === "long_term").length, 0);
+  const result = await activeEngine.observe([confirmation], { permissions });
+  const promoted = result.memories.find((item) => item.memory_tier === "long_term");
+  assert.equal(promoted.sensitivity, "sensitive");
+  assert.equal(promoted.service_role, "hard_constraint");
+  assert.equal(promoted.evidence_event_ids.includes("confirm"), true);
+  assert.equal(result.promotion_decisions[0].action, "promote");
+  assert.equal(result.promotion_groups[0].confirmation.event_id, "confirm");
+  const denied = await activeEngine.recall({ user_id: "usr_1", purpose: "decision" });
+  assert.equal(denied.memories.some((item) => item.memory.memory_id === promoted.memory_id), false);
+  await activeEngine.forget({ user_id: "usr_1", memory_id: "mem_h1a", permissions: ["memory:forget"] });
+  assert.equal((await repository.snapshot()).observation_events.some((item) => item.event_id === "confirm"), false);
+});
+
+test("explicit future-wide claim enters a proposal even when marked long-term", async () => {
+  const now = "2026-01-01T00:00:00Z";
+  const repository = createInMemoryMemoryRepository();
+  const broad = candidate("future", "future_event", 0.9, {
+    memory_tier: "long_term", retention: "long_term_candidate", explicit_generalization: true,
+    scope: { domain: "travel" }
+  });
+  const engine = createMemoryEngine({ repository, clock: { now: () => now },
+    extractor: createScriptedExtractor({ future_event: [broad] }) });
+  const first = await engine.observe([event("future_event", "t1", now, { trip_kind: "leisure_trip" })]);
+  assert.equal(first.memories.filter((item) => item.memory_tier === "long_term").length, 0);
+  assert.equal(first.promotion_groups[0].status, "needs_confirmation");
+  assert.ok(first.promotion_groups[0].proposal_id);
+  const group = first.promotion_groups[0];
+  const confirmed = await engine.observe([{ ...event("future_confirm", "t1", now),
+    event_type: "feedback.user_confirmed", payload: { promotion_group_id: group.group_id,
+      proposal_id: group.proposal_id } }]);
+  assert.equal(confirmed.promotion_decisions[0].action, "promote");
+  assert.deepEqual(confirmed.memories.find((item) => item.memory_tier === "long_term").scope,
+    { domain: "travel" });
 });
 
 test("group identity ignores trip and session but keeps subject, domain, kind and safe scope anchor", () => {
@@ -108,6 +176,9 @@ test("candidate pool survives short-term expiry and expires through an independe
   now = "2026-04-05T00:00:00Z";
   const expired = await engine.expirePromotionGroups();
   assert.equal(expired.groups.length, 1);
+  const decisions = await repository.listPromotionDecisions("usr_1", expired.groups[0].group_id);
+  assert.equal(decisions.at(-1).action, "expire");
+  assert.deepEqual(decisions.at(-1).reason_codes, ["OBSERVATION_WINDOW_EXPIRED"]);
   assert.equal(expired.pending.length, 1);
   assert.equal((await repository.snapshot()).promotion_groups[0].status, "expired");
   const freshEvent = event("e2", "trip_2", now);

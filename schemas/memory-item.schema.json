@@ -31,6 +31,7 @@
     "promotion_id": {"type": "string"},
     "promotion_group_id": {"type": "string"},
     "promotion_policy_version": {"type": "string"},
+    "promotion_generation": {"type": "integer", "minimum": 1},
     "generalized_scope": {"type": "object"},
     "promoted_at": {"type": "string", "format": "date-time"},
     "valid_from": {"type": "string", "format": "date-time"},
